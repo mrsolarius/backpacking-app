@@ -1,7 +1,5 @@
 package fr.louisvolat.services
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
@@ -9,45 +7,65 @@ import android.os.IBinder
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import fr.louisvolat.LocationRequester
-import fr.louisvolat.MainActivity
 import fr.louisvolat.R
 
 class LocationService : Service() {
 
     private lateinit var locationRequester: LocationRequester
 
-    private fun createNotificationChannel() {
-        val serviceChannel = NotificationChannel(
-            CHANNEL_ID,
-            "Location Service Channel",
-            NotificationManager.IMPORTANCE_HIGH  // Change importance to high
-        )
+    @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            Action.START.name -> {
+                start()
+            }
 
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(serviceChannel)
+            Action.STOP.name -> {
+                stopSelf()
+            }
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
-    override fun onCreate() {
-        super.onCreate()
+    private fun start() {
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.location_service_channel))
+            .setContentText(getString(R.string.tracking_running))
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .addAction(
+                R.drawable.ic_launcher_foreground,
+                getString(R.string.stop_tracking_notif),
+                Intent(this, LocationService::class.java).apply {
+                    action = Action.STOP.name
+                }.let { stopIntent ->
+                    PendingIntent.getService(
+                        this,
+                        0,
+                        stopIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                }
+            )
+            .setDeleteIntent(
+                Intent(this, LocationService::class.java).apply {
+                    action = Action.STOP.name
+                }.let { stopIntent ->
+                    PendingIntent.getService(
+                        this,
+                        0,
+                        stopIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                }
+            )
+            .build()
+        startForeground(1, notification)
 
         locationRequester = LocationRequester(this, 10000, 0f)
         locationRequester.startLocationTracking()
 
-        createNotificationChannel()
-        val notificationIntent = Intent(this, MainActivity::class.java)
-        val pendingIntent =
-            PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Location Service")
-            .setContentText("Running...")
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)  // Set priority to high
-            .build()
-
-        startForeground(1, notification)
     }
 
     override fun onDestroy() {
@@ -60,6 +78,13 @@ class LocationService : Service() {
     }
 
     companion object {
-        const val CHANNEL_ID = "LocationServiceChannel"
+        const val CHANNEL_ID = "location_service_channel"
     }
+
+    enum class Action {
+        START,
+        STOP
+    }
+
+
 }

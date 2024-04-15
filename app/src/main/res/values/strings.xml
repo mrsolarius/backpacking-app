@@ -50,4 +50,7 @@
     <string name="track_activated">Tracking activé</string>
     <string name="track_disable">Tracking désactivé</string>
     <string name="permission_denied">Permision non accorder</string>
+    <string name="location_service_channel">Tracker de positions</string>
+    <string name="stop_tracking_notif">Arreter le tracking</string>
+    <string name="tracking_running">Tracking en cours…</string>
 </resources>

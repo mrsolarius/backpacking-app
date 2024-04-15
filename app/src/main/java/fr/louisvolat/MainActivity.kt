@@ -16,7 +16,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private lateinit var binding: ActivityMainBinding
-    private var tracking: Boolean = false;
+    private var tracking: Boolean = false
     private lateinit var buttonTrack: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,21 +52,47 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun checkNotificationPermission(): Boolean {
+        return ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestNotificationPermission() {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(
+                Manifest.permission.POST_NOTIFICATIONS
+            ),
+            10
+        )
+    }
+
     private fun handleTackButtonClick() {
-        val serviceIntent = Intent(this, LocationService::class.java)
         if (!tracking) {
-            this.buttonTrack.setText(R.string.start_track)
+            this.buttonTrack.setText(R.string.stop_track)
+            if (!checkNotificationPermission()) {
+                requestNotificationPermission()
+                return
+            }
             if (checkLocationPermission()) {
                 Toast.makeText(this, R.string.track_activated, Toast.LENGTH_SHORT).show()
-                startForegroundService(Intent(this, LocationService::class.java))
+                Intent(this, LocationService::class.java).also { intent ->
+                    intent.action = LocationService.Action.START.toString()
+                    startService(intent)
+                }
                 tracking = true
             } else {
                 requestLocationPermission()
             }
         } else {
-            this.buttonTrack.setText(R.string.stop_track)
+            this.buttonTrack.setText(R.string.start_track)
             Toast.makeText(this, R.string.track_disable, Toast.LENGTH_SHORT).show()
-            stopService(serviceIntent)
+            Intent(this, LocationService::class.java).also { intent ->
+                intent.action = LocationService.Action.STOP.toString()
+                stopService(intent)
+            }
             tracking = false
         }
     }
