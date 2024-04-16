@@ -1,4 +1,4 @@
-package fr.louisvolat.services
+package fr.louisvolat.locations
 
 import android.app.PendingIntent
 import android.app.Service
@@ -6,12 +6,17 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
-import fr.louisvolat.LocationRequester
 import fr.louisvolat.R
+import fr.louisvolat.database.Coordinate
+import fr.louisvolat.database.CoordinateDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
-class LocationService : Service() {
+class LocationService : Service(), LocationSaver {
 
     private lateinit var locationRequester: LocationRequester
+    private lateinit var database: CoordinateDatabase
 
     @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -63,9 +68,14 @@ class LocationService : Service() {
             .build()
         startForeground(1, notification)
 
-        locationRequester = LocationRequester(this, 10000, 0f)
+        locationRequester = LocationRequester(this, 10000, 0f,this)
         locationRequester.startLocationTracking()
 
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        database = CoordinateDatabase.getDatabase(this)
     }
 
     override fun onDestroy() {
@@ -84,6 +94,13 @@ class LocationService : Service() {
     enum class Action {
         START,
         STOP
+    }
+
+    override fun saveLocation(latitude: Double, longitude: Double, altitude: Double, time: Long) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val coordinate = Coordinate(time,latitude, longitude, altitude)
+            database.coordinateDao().insert(coordinate)
+        }
     }
 
 

@@ -1,4 +1,4 @@
-package fr.louisvolat
+package fr.louisvolat.locations
 import android.content.Context
 import android.os.Looper
 import android.util.Log
@@ -18,7 +18,8 @@ import java.time.format.DateTimeFormatter
 class LocationRequester (
     private var context: Context,
     private var timeInterval: Long,
-    private var minimalDistance: Float
+    private var minimalDistance: Float,
+    private var locationCallback: LocationSaver
 ) : LocationCallback() {
 
     private var request: LocationRequest
@@ -39,15 +40,6 @@ class LocationRequester (
         }.build()
 
     @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
-    fun changeRequest(timeInterval: Long, minimalDistance: Float) {
-        this.timeInterval = timeInterval
-        this.minimalDistance = minimalDistance
-        createRequest()
-        stopLocationTracking()
-        startLocationTracking()
-    }
-
-    @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
     fun startLocationTracking() {
         locationClient.requestLocationUpdates(request, this, Looper.getMainLooper())
     }
@@ -60,20 +52,22 @@ class LocationRequester (
 
     override fun onLocationResult(location: LocationResult) {
         //Display the location and the time in a Toast and in the log
-        val location = location.lastLocation
-        if (location == null) {
+        val locationData = location.lastLocation
+        if (locationData == null) {
             Log.d("Location", "Location is null")
             Toast.makeText(this.context, "Location is null", Toast.LENGTH_SHORT).show()
             return
         }
+
+        locationCallback.saveLocation(locationData.latitude,locationData.longitude,locationData.altitude,locationData.time)
+
         // Display the location in the log and in a Toast and don't forget time and date
         //get current date
         val currentDateTime = LocalDateTime.now()
         //convert current date to string with format "yyyy-MM-dd HH:mm:ss"
         val currentDateTimeString = currentDateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
 
-
-        Log.d("Location", "Time:${currentDateTimeString}\nLocation: ${location.latitude}, ${location.longitude}")
+        Log.d("Location", "Time:${currentDateTimeString}\nLocation: ${locationData.latitude}, ${locationData.longitude}")
         //Toast.makeText(this.context, "Time:${currentDateTimeString}\nLocation: ${location.latitude}, ${location.longitude}", Toast.LENGTH_LONG).show()
     }
 

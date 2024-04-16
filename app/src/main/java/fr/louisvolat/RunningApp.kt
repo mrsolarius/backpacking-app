@@ -3,7 +3,7 @@ package fr.louisvolat
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import fr.louisvolat.services.LocationService
+import fr.louisvolat.locations.LocationService
 
 class RunningApp: Application() {
 

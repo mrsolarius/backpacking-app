@@ -8,8 +8,13 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import fr.louisvolat.database.CoordinateDatabase
 import fr.louisvolat.databinding.ActivityMainBinding
-import fr.louisvolat.services.LocationService
+import fr.louisvolat.locations.LocationService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 
 
 class MainActivity : AppCompatActivity() {
@@ -18,6 +23,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var tracking: Boolean = false
     private lateinit var buttonTrack: Button
+    private lateinit var buttonSend: Button
+    private var lastUpdate: LocalDateTime = LocalDateTime.now()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,8 +34,35 @@ class MainActivity : AppCompatActivity() {
 
 
         this.buttonTrack = binding.buttonTack
+        this.buttonSend = binding.buttonSendData
 
         this.buttonTrack.setOnClickListener { this.handleTackButtonClick() }
+        this.buttonSend.setOnClickListener { this.handleSendButtonClick() }
+    }
+
+    private fun handleSendButtonClick() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val fullText = StringBuilder()
+            CoordinateDatabase.getDatabase(applicationContext).coordinateDao()
+                .getFromDate(lastUpdate).forEach() {
+                fullText.append(it.toString())
+                fullText.append("\n")
+            }
+            if (fullText.isEmpty()) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, R.string.no_data_to_send, Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                val sendIntent: Intent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, fullText.toString())
+                    type = "text/plain"
+                }
+
+                val shareIntent = Intent.createChooser(sendIntent, null)
+                startActivity(shareIntent)
+            }
+        }
     }
 
     private fun checkLocationPermission(): Boolean {

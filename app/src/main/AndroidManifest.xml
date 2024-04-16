@@ -19,7 +19,7 @@
         android:theme="@style/Theme.Backpacking"
         >
         <service
-            android:name=".services.LocationService"
+            android:name=".locations.LocationService"
             android:foregroundServiceType="location" />
         <activity
             android:name=".MainActivity"

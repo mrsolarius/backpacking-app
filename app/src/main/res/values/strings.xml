@@ -53,4 +53,6 @@
     <string name="location_service_channel">Tracker de positions</string>
     <string name="stop_tracking_notif">Arreter le tracking</string>
     <string name="tracking_running">Tracking en cours…</string>
+    <string name="send_data">Envoyer les données</string>
+    <string name="no_data_to_send">Aucune données à envoyer</string>
 </resources>
