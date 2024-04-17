@@ -31,8 +31,6 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-
         this.buttonTrack = binding.buttonTack
         this.buttonSend = binding.buttonSendData
 

@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.google.android.gms)
     implementation(libs.jetbrains.kotlinx.coroutines.core)
+    implementation(libs.androidx.datastore.preferences)
     //Room
     implementation(libs.androidx.room.runtime)
     annotationProcessor(libs.androidx.room.compiler)
