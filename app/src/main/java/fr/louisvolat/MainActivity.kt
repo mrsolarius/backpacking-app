@@ -8,6 +8,7 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import fr.louisvolat.database.Converter
 import fr.louisvolat.database.CoordinateDatabase
 import fr.louisvolat.databinding.ActivityMainBinding
 import fr.louisvolat.locations.LocationService
@@ -42,7 +43,7 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             val fullText = StringBuilder()
             CoordinateDatabase.getDatabase(applicationContext).coordinateDao()
-                .getFromDate(lastUpdate).forEach() {
+                .getFromDate(Converter.dateToTimestamp(lastUpdate)!!).forEach() {
                 fullText.append(it.toString())
                 fullText.append("\n")
             }

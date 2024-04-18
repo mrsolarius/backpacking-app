@@ -35,6 +35,7 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    buildToolsVersion = "34.0.0"
 }
 
 dependencies {
@@ -49,6 +50,10 @@ dependencies {
     implementation(libs.google.android.gms)
     implementation(libs.jetbrains.kotlinx.coroutines.core)
     implementation(libs.androidx.datastore.preferences)
+    //Retrofit
+    implementation(libs.squareup.retrofit2)
+    implementation(libs.squareup.retrofit2.converter.gson)
+
     //Room
     implementation(libs.androidx.room.runtime)
     annotationProcessor(libs.androidx.room.compiler)

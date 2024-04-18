@@ -4,14 +4,24 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import fr.louisvolat.R
 import fr.louisvolat.database.Coordinate
 import fr.louisvolat.database.CoordinateDatabase
+import fr.louisvolat.worker.UploadLocationsWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class LocationService : Service(), LocationSaver {
 
@@ -70,7 +80,47 @@ class LocationService : Service(), LocationSaver {
 
         locationRequester = LocationRequester(this, 10000, 0f,this)
         locationRequester.startLocationTracking()
+        scheduleUploadLocationsWorker()
+        Log.i("LocationService", "Service successfully started")
+    }
 
+    private fun scheduleUploadLocationsWorker() {
+        Log.i("LocationService", "Scheduling UploadLocationsWorker")
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val uploadWorkerRequest = PeriodicWorkRequestBuilder<UploadLocationsWorker>(90, TimeUnit.MINUTES)
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "UploadLocationsWorkerPeriodic",
+            ExistingPeriodicWorkPolicy.KEEP,
+            uploadWorkerRequest
+        )
+    }
+
+    private fun stop() {
+        locationRequester.stopLocationTracking()
+        WorkManager.getInstance(this).cancelUniqueWork("UploadLocationsWorkerPeriodic")
+        executeUploadLocationsWorkerOneTime()
+        stopSelf()
+        Log.i("LocationService", "Service successfully stopped")
+    }
+
+    private fun executeUploadLocationsWorkerOneTime() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val uploadWorkerRequest = OneTimeWorkRequest.Builder(UploadLocationsWorker::class.java)
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
+            .build()
+
+        WorkManager.getInstance(this).enqueue(uploadWorkerRequest)
     }
 
     override fun onCreate() {
@@ -80,7 +130,7 @@ class LocationService : Service(), LocationSaver {
 
     override fun onDestroy() {
         super.onDestroy()
-        locationRequester.stopLocationTracking()
+        stop()
     }
 
     override fun onBind(intent: Intent): IBinder? {
