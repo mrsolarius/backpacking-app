@@ -81,7 +81,7 @@ class LocationService : Service(), LocationSaver {
             .build()
         startForeground(1, notification)
 
-        locationRequester = LocationRequester(this, 30000, 10f,this)
+        locationRequester = LocationRequester(this, 15000, 10f,this)
         locationRequester.startLocationTracking()
         scheduleUploadLocationsWorker()
         Log.i("LocationService", "Service successfully started")
