@@ -7,6 +7,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -49,6 +50,8 @@ class LocationService : Service(), LocationSaver {
             .setContentText(getString(R.string.tracking_running))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setColor(ContextCompat.getColor(applicationContext,R.color.green))
+            .setColorized(true)
             .addAction(
                 R.drawable.ic_launcher_foreground,
                 getString(R.string.stop_tracking_notif),
@@ -78,7 +81,7 @@ class LocationService : Service(), LocationSaver {
             .build()
         startForeground(1, notification)
 
-        locationRequester = LocationRequester(this, 10000, 0f,this)
+        locationRequester = LocationRequester(this, 30000, 10f,this)
         locationRequester.startLocationTracking()
         scheduleUploadLocationsWorker()
         Log.i("LocationService", "Service successfully started")

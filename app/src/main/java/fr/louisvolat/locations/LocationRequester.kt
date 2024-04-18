@@ -67,7 +67,7 @@ class LocationRequester (
         //convert current date to string with format "yyyy-MM-dd HH:mm:ss"
         val currentDateTimeString = currentDateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
 
-        Log.d("Location", "Time:${currentDateTimeString}\nLocation: ${locationData.latitude}, ${locationData.longitude}")
+        Log.d("Location", "Location: ${locationData.latitude}, ${locationData.longitude}, Altitude: ${locationData.altitude} ;Time:${currentDateTimeString}; ")
         //Toast.makeText(this.context, "Time:${currentDateTimeString}\nLocation: ${location.latitude}, ${location.longitude}", Toast.LENGTH_LONG).show()
     }
 

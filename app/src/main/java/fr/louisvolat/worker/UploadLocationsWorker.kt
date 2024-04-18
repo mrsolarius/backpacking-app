@@ -29,7 +29,7 @@ class UploadLocationsWorker(appContext: Context, workerParams: WorkerParameters)
     Worker(appContext, workerParams) {
 
     var retrofit = Retrofit.Builder()
-        .baseUrl("http://192.168.1.10:8000")
+        .baseUrl("https://api.backpaking.louisvolat.fr")
         .addConverterFactory(GsonConverterFactory.create())
         .build()
 
