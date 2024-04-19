@@ -50,6 +50,8 @@ dependencies {
     implementation(libs.google.android.gms)
     implementation(libs.jetbrains.kotlinx.coroutines.core)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.preference.ktx)
+
     //Retrofit
     implementation(libs.squareup.retrofit2)
     implementation(libs.squareup.retrofit2.converter.gson)

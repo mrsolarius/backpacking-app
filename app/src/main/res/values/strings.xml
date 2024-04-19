@@ -55,4 +55,13 @@
     <string name="tracking_running">Tracking en cours…</string>
     <string name="send_data">Envoyer les données</string>
     <string name="no_data_to_send">Aucune données à envoyer</string>
+    <string name="edit_api_preferance">Changer l\'URL de l\'API</string>
+    <string name="api_preferances">Paramètres de l\'API</string>
+    <string name="edit_login_pref">Editer votre nom d\'utilisateur</string>
+    <string name="edit_api_password">Editer votre mots de passe</string>
+    <string name="localization_settings">Parametres de localisations</string>
+    <string name="edit_time_interval">Editer l\'interval de temps (min)</string>
+    <string name="edit_min_distance">Editer la distance minimal (mètres)</string>
+    <string name="menu_tracker">Tracker</string>
+    <string name="menu_settings">Paramètres</string>
 </resources>

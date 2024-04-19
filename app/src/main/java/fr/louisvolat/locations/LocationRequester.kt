@@ -22,14 +22,8 @@ class LocationRequester (
     private var locationCallback: LocationSaver
 ) : LocationCallback() {
 
-    private var request: LocationRequest
-    private var locationClient: FusedLocationProviderClient
-
-    init {
-        // getting the location client
-        locationClient = LocationServices.getFusedLocationProviderClient(context)
-        request = createRequest()
-    }
+    private var request: LocationRequest = createRequest()
+    private var locationClient: FusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context)
 
     private fun createRequest(): LocationRequest =
         // New builder
