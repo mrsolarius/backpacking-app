@@ -34,7 +34,11 @@ class MainActivity : AppCompatActivity() {
                         .replace(R.id.fragmentContainerView, MainFragment()).commit()
                     true
                 }
-
+                R.id.upload -> {
+                    supportFragmentManager.beginTransaction()
+                        .replace(R.id.fragmentContainerView, UploadFragment()).commit()
+                    true
+                }
                 R.id.settings -> {
                     supportFragmentManager.beginTransaction()
                         .replace(R.id.fragmentContainerView, SettingsFragment()).commit()

@@ -55,6 +55,8 @@ dependencies {
     //Retrofit
     implementation(libs.squareup.retrofit2)
     implementation(libs.squareup.retrofit2.converter.gson)
+    //OkHttp
+    implementation(libs.squareup.okhttp3)
 
     //Room
     implementation(libs.androidx.room.runtime)
