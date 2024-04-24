@@ -7,7 +7,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.work.Data
@@ -47,11 +46,11 @@ class UploadFragment : Fragment() {
     }
 
     private fun launchNewPhotoPicker(){
-//Launch the photo picker and let the user choose images .
-        newPiker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        // newPiker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        newPiker.launch(arrayOf("image/jpeg"))
     }
-
-    val newPiker=registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(5)) { uris ->
+    //val newPiker=registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(5)) { uris ->
+    private val newPiker=registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris != null) {
             Log.d("PhotoPicker", "Selected URI: ${uris}")
             //launch the worker to upload the images
