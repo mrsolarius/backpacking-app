@@ -1,17 +1,17 @@
 package fr.louisvolat.api.mapper
 
-import fr.louisvolat.api.dto.CoordinatePostBodyDTO
+import fr.louisvolat.api.dto.CreateCoordinateRequest
 import fr.louisvolat.database.Converter
 import fr.louisvolat.database.Coordinate
 
 class CoordinatePostMapper {
     companion object {
-        fun mapToDTO(coordinate: Coordinate): CoordinatePostBodyDTO {
+        fun mapToDTO(coordinate: Coordinate): CreateCoordinateRequest {
 
-            return CoordinatePostBodyDTO(
+            return CreateCoordinateRequest(
                 latitude = coordinate.latitude.toString(),
                 longitude = coordinate.longitude.toString(),
-                date = Converter.fromTimestampToString(coordinate.date)!!
+                date = Converter.fromTimestampToZonedDateTime(coordinate)
             )
         }
     }

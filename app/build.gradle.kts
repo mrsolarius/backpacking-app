@@ -57,7 +57,8 @@ dependencies {
     implementation(libs.squareup.retrofit2.converter.gson)
     //OkHttp
     implementation(libs.squareup.okhttp3)
-
+    // OkHttp Logging Interceptor
+    implementation(libs.squareup.okhttp3.logging)
     //Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.exifinterface)

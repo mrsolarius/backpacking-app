@@ -151,7 +151,7 @@ class LocationService : Service(), LocationSaver {
 
     override fun saveLocation(latitude: Double, longitude: Double, altitude: Double, time: Long) {
         CoroutineScope(Dispatchers.IO).launch {
-            val coordinate = Coordinate(time,latitude, longitude, altitude)
+            val coordinate = Coordinate.createWithCurrentTimeZone(time,latitude, longitude, altitude)
             database.coordinateDao().insert(coordinate)
         }
     }

@@ -9,7 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.work.Worker
 import androidx.work.WorkerParameters
-import fr.louisvolat.api.dto.CoordinateListPostDTO
+import fr.louisvolat.api.dto.CreateCoordinatesRequest
 import fr.louisvolat.api.mapper.CoordinatePostMapper
 import fr.louisvolat.api.services.CoordinateService
 import fr.louisvolat.database.CoordinateDatabase
@@ -48,8 +48,11 @@ class UploadLocationsWorker(appContext: Context, workerParams: WorkerParameters)
             Log.i("UploadLocationsWorker", "No data to send")
             return Result.success()
         }
-        val postCoordinate = retrofit.create(CoordinateService::class.java).postCoordinates(
-            CoordinateListPostDTO(coordinatesList)
+        val postCoordinate = retrofit.create(CoordinateService::class.java).addCoordinatesToTravel(
+            1,
+            CreateCoordinatesRequest(
+                coordinates = coordinatesList
+            )
         )
         val requestResult = postCoordinate.execute()
 

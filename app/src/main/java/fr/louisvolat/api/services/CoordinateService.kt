@@ -1,25 +1,25 @@
 package fr.louisvolat.api.services
 
 import fr.louisvolat.api.dto.CoordinateDTO
-import fr.louisvolat.api.dto.CoordinateListPostDTO
+import fr.louisvolat.api.dto.CreateCoordinateResponseConfirm
+import fr.louisvolat.api.dto.CreateCoordinatesRequest
 import retrofit2.Call
-import retrofit2.http.Body
-import retrofit2.http.DELETE
-import retrofit2.http.GET
-import retrofit2.http.POST
-import retrofit2.http.Path
+import retrofit2.http.*
 
 interface CoordinateService {
-    @GET("/api/coordinates")
-    fun getCoordinates(): Call<List<CoordinateDTO>>
+    @GET("/api/travels/{travelId}/coordinates")
+    fun getCoordinatesByTravel(@Path("travelId") travelId: Long): Call<List<CoordinateDTO>>
 
-    @POST("/api/coordinates")
-    fun postCoordinates(@Body coordinates: CoordinateListPostDTO): Call<List<CoordinateDTO>>
+    @POST("/api/travels/{travelId}/coordinates")
+    fun addCoordinatesToTravel(
+        @Path("travelId") travelId: Long,
+        @Body request: CreateCoordinatesRequest
+    ): Call<CreateCoordinateResponseConfirm>
 
-    @GET("/api/coordinates/{id}")
-    fun getCoordinate(@Path("id") id: Int): Call<CoordinateDTO>
-
-    @DELETE("/api/coordinates/{id}")
-    fun deleteCoordinate(@Path("id") id: Int): Call<String>
+    @DELETE("/api/travels/{travelId}/coordinates/{id}")
+    fun deleteCoordinate(
+        @Path("travelId") travelId: Long,
+        @Path("id") id: Long
+    ): Call<String>
 
 }

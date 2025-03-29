@@ -4,21 +4,11 @@
     <PreferenceCategory android:title="@string/api_preferances">
 
         <EditTextPreference
-            android:defaultValue="Default value"
+            android:defaultValue="http://10.0.2.2:8080"
             android:key="api_url"
             android:selectAllOnFocus="true"
             android:singleLine="true"
             android:title="@string/edit_api_preferance" />
-        <EditTextPreference
-            android:key="api_user"
-            android:selectAllOnFocus="true"
-            android:singleLine="true"
-            android:title="@string/edit_login_pref" />
-        <EditTextPreference
-            android:key="api_pass"
-            android:selectAllOnFocus="true"
-            android:singleLine="true"
-            android:title="@string/edit_api_password" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/localization_settings">
 
