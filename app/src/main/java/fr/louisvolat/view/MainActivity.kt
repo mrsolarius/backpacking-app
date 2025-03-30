@@ -19,7 +19,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        supportFragmentManager.beginTransaction().replace(R.id.fragmentContainerView,MainFragment()).commit()
+        supportFragmentManager.beginTransaction().replace(R.id.fragmentContainerView,TravelsFragment()).commit()
 
         mbottomNavigationView=findViewById(R.id.bottom_navigation)
 
@@ -29,9 +29,14 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigation() {
         mbottomNavigationView.setOnItemSelectedListener { item ->
             when (item.itemId) {
+                R.id.travels -> {
+                    supportFragmentManager.beginTransaction()
+                        .replace(R.id.fragmentContainerView, TravelsFragment()).commit()
+                    true
+                }
                 R.id.tracker -> {
                     supportFragmentManager.beginTransaction()
-                        .replace(R.id.fragmentContainerView, MainFragment()).commit()
+                        .replace(R.id.fragmentContainerView, TrackerFragment()).commit()
                     true
                 }
                 R.id.upload -> {

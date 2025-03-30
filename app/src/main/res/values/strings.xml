@@ -39,4 +39,7 @@
     <string name="fields_required">Tous les champs sont requis</string>
     <string name="app_logo">Logo de l\'application</string>
     <string name="back_button">Retour</string>
+    <string name="menu_travels">Voyages\n</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>

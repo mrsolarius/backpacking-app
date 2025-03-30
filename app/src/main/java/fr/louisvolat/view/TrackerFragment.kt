@@ -17,13 +17,13 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import fr.louisvolat.R
-import fr.louisvolat.databinding.FragmentMainBinding
+import fr.louisvolat.databinding.FragmentTrackerBinding
 import fr.louisvolat.locations.LocationService
 import fr.louisvolat.worker.UploadLocationsWorker
 import java.util.concurrent.TimeUnit
 
-class MainFragment : Fragment() {
-    private var _binding: FragmentMainBinding? = null
+class TrackerFragment : Fragment() {
+    private var _binding: FragmentTrackerBinding? = null
 
     // This property is only valid between onCreateView and
     // onDestroyView.
@@ -42,7 +42,7 @@ class MainFragment : Fragment() {
     ): View {
         // Inflate the layout for this fragment
 
-        _binding = FragmentMainBinding.inflate(inflater, container, false)
+        _binding = FragmentTrackerBinding.inflate(inflater, container, false)
 
         this.buttonTrack = binding.buttonTack
         this.buttonSend = binding.buttonSendData

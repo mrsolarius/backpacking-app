@@ -18,7 +18,7 @@
 
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/fragmentContainerView"
-            android:name="fr.louisvolat.view.MainFragment"
+            android:name="fr.louisvolat.view.TrackerFragment"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
     </FrameLayout>

@@ -2,6 +2,10 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
+        android:id="@+id/travels"
+        android:icon="@drawable/outline_backpack_24"
+        android:title="@string/menu_travels" />
+    <item
         android:id="@+id/tracker"
         android:icon="@drawable/outline_my_location_24"
         android:title="@string/menu_tracker" />
