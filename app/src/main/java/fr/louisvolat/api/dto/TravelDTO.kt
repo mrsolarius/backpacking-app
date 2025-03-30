@@ -8,7 +8,7 @@ data class TravelDTO(
     val description: String,
     val startDate: String,
     val endDate: String?,
-    val coverPictureId: Long?,
+    val coverPicture: PictureDTO?,
     val userId: Long,
     val coordinates: List<CoordinateDTO>?,
     val pictures: List<PictureDTO>?,

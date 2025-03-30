@@ -1,28 +1,104 @@
 package fr.louisvolat.view
 
 import android.os.Bundle
-import androidx.fragment.app.Fragment
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import fr.louisvolat.R
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import fr.louisvolat.api.ApiClient
+import fr.louisvolat.data.repository.TravelRepository
+import fr.louisvolat.data.viewmodel.TravelViewModel
+import fr.louisvolat.data.viewmodel.TravelViewModelFactory
+import fr.louisvolat.database.BackpakingLocalDataBase
+import fr.louisvolat.databinding.FragmentTravelsBinding
+import fr.louisvolat.view.adapter.TravelAdapter
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
-/**
- * A simple [Fragment] subclass.
- * Use the [TravelsFragment.newInstance] factory method to
- * create an instance of this fragment.
- */
 class TravelsFragment : Fragment() {
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    private var _binding: FragmentTravelsBinding? = null
+    private val binding get() = _binding!!
+    private lateinit var swipeRefreshLayout: SwipeRefreshLayout
+
+    private val viewModel: TravelViewModel by viewModels {
+        TravelViewModelFactory(
+            TravelRepository(
+                BackpakingLocalDataBase.getDatabase(requireContext()).travelDao(),
+                ApiClient.getInstance(requireContext())
+            )
+        )
     }
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_travels, container, false)
+    ): View {
+        _binding = FragmentTravelsBinding.inflate(inflater, container, false)
+        return binding.root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        swipeRefreshLayout = binding.swipeRefreshLayout
+        swipeRefreshLayout.setOnRefreshListener { refreshData() }
+
+        setupRecyclerView()
+        setupObservers()
+    }
+
+    private fun setupRecyclerView() {
+        binding.recyclerView.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = TravelAdapter { travel ->
+                // Gérer le clic sur un voyage
+                // Exemple : navigation vers le détail
+                Log.d("TravelsFragment", "Clicked on travel: $travel")
+            } // Remplacez par votre adapteur
+        }
+    }
+
+    private fun setupObservers() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.travels.collectLatest { travels ->
+                    (binding.recyclerView.adapter as? TravelAdapter)?.submitList(travels)
+                    swipeRefreshLayout.isRefreshing = false
+                }
+            }
+        }
+    }
+
+    private fun refreshData() {
+        swipeRefreshLayout.isRefreshing = true
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                viewModel.refreshTravels(
+                    onComplete = {
+                        // Rafraîchissement terminé
+                        // Vous pouvez mettre à jour l'interface utilisateur ici si nécessaire
+                        Log.d("TravelsFragment", "Travels refreshed")
+                    }
+                )
+            } catch (e: Exception) {
+                // Gérer les erreurs ici
+            } finally {
+                swipeRefreshLayout.isRefreshing = false
+            }
+        }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

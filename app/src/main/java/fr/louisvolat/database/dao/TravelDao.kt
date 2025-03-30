@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import fr.louisvolat.database.entity.Travel
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TravelDao {
@@ -18,5 +19,5 @@ interface TravelDao {
     suspend fun getById(id: Long): Travel?
 
     @Query("SELECT * FROM travels")
-    suspend fun getAll(): List<Travel>
+    fun getAll(): Flow<List<Travel>>
 }
