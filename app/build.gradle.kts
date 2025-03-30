@@ -11,8 +11,8 @@ android {
 
     defaultConfig {
         applicationId = "fr.louisvolat"
-        minSdk = 35
-        targetSdk = 35
+        minSdk = 34
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -63,7 +63,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.activity)
-    implementation(libs.jsonwebtoken.jjwt)
     annotationProcessor(libs.androidx.room.compiler)
 
     // To use Kotlin Symbol Processing (KSP)

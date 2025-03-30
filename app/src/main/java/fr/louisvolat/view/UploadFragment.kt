@@ -51,17 +51,13 @@ class UploadFragment : Fragment() {
     }
     //val newPiker=registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(5)) { uris ->
     private val newPiker=registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        if (uris != null) {
-            Log.d("PhotoPicker", "Selected URI: ${uris}")
-            //launch the worker to upload the images
-            runUploadImageWorker(uris)
-        } else {
-            Log.d("PhotoPicker", "No media selected")
-        }
+        Log.d("PhotoPicker", "Selected URI: ${uris}")
+        //launch the worker to upload the images
+        runUploadImageWorker(uris)
     }
 
     private fun runUploadImageWorker(uris: List<Uri>) {
-        val strUris = uris.map { it.toString() }.toTypedArray()
+        val strUris = uris.map { it.toString() }.toTypedArray<String?>()
         val data = Data.Builder()
             .putStringArray("uris", strUris)
             .build()

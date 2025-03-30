@@ -10,10 +10,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import fr.louisvolat.R
 import fr.louisvolat.api.ApiClient
-import fr.louisvolat.api.dto.LoginRequest
-import fr.louisvolat.api.dto.LoginResponse
 import kotlinx.coroutines.*
-import retrofit2.Response
 
 class LoginActivity(private val dispatcherMain: CoroutineDispatcher = Dispatchers.Main) : AppCompatActivity() {
 
@@ -65,11 +62,29 @@ class LoginActivity(private val dispatcherMain: CoroutineDispatcher = Dispatcher
         // Appel à l'API pour le login
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val loginRequest = LoginRequest(username, password)
-                val response = apiClient.authService.login(loginRequest).execute()
+                // Utiliser la méthode auth.login au lieu de authService.login directement
+                var loginSuccess = false
+                var loginError: String? = null
+
+                // Créer un CompletableDeferred pour attendre la réponse asynchrone
+                val deferred = CompletableDeferred<Unit>()
+
+                apiClient.auth.login(username, password,
+                    onSuccess = {
+                        loginSuccess = true
+                        deferred.complete(Unit)
+                    },
+                    onError = { errorMessage ->
+                        loginError = errorMessage
+                        deferred.complete(Unit)
+                    }
+                )
+
+                // Attendre que l'opération asynchrone soit terminée
+                deferred.await()
 
                 withContext(dispatcherMain) {
-                    handleLoginResponse(response)
+                    handleLoginResponse(loginSuccess, loginError)
                 }
             } catch (e: Exception) {
                 withContext(dispatcherMain) {
@@ -80,14 +95,12 @@ class LoginActivity(private val dispatcherMain: CoroutineDispatcher = Dispatcher
         }
     }
 
-    private fun handleLoginResponse(response: Response<LoginResponse>) {
+    private fun handleLoginResponse(isSuccess: Boolean, loginError: String?) {
         setLoading(false)
-
-        if (response.isSuccessful && response.body() != null) {
-            apiClient.handleSuccessfulLogin(response.body())
+        if (isSuccess) {
             navigateToMainActivity()
         } else {
-            Toast.makeText(this, R.string.login_failed, Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@LoginActivity, loginError ?: getString(R.string.login_error), Toast.LENGTH_SHORT).show()
         }
     }
 
