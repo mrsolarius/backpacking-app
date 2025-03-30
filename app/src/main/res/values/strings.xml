@@ -29,4 +29,14 @@
     <string name="menu_settings">Paramètres</string>
     <string name="menu_upload">Upload</string>
     <string name="upload_file">Envoyer des images</string>
+    <string name="app_icon">🎒</string>
+    <string name="login_hint">Email</string>
+    <string name="passwordHint">Mot de passe</string>
+    <string name="connectButton">Se connecter</string>
+    <string name="settings">Paramètres</string>
+    <string name="login_failed">Échec de la connexion</string>
+    <string name="login_error">Erreur lors de la connexion</string>
+    <string name="fields_required">Tous les champs sont requis</string>
+    <string name="app_logo">Logo de l\'application</string>
+    <string name="back_button">Retour</string>
 </resources>
