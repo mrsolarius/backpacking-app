@@ -7,15 +7,29 @@
     android:layout_height="wrap_content"
     android:padding="16dp">
 
+    <ImageView
+        android:id="@+id/travelCoverImage"
+        android:layout_width="0dp"
+        android:layout_height="150dp"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        tools:visibility="visible"
+        tools:src="@tools:sample/backgrounds/scenic"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:contentDescription="@string/travel_img"/>
+
     <TextView
         android:id="@+id/travelName"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:textSize="18sp"
         android:textStyle="bold"
+        android:layout_marginTop="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/travelCoverImage"
         tools:text="Mon voyage"/>
 
     <TextView

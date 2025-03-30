@@ -4,7 +4,9 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import fr.louisvolat.database.entity.Travel
+import fr.louisvolat.database.entity.TravelWithCoverPicture
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -20,4 +22,8 @@ interface TravelDao {
 
     @Query("SELECT * FROM travels")
     fun getAll(): Flow<List<Travel>>
+
+    @Transaction
+    @Query("SELECT * FROM travels")
+    fun getAllWithCoverPictures(): Flow<List<TravelWithCoverPicture>>
 }

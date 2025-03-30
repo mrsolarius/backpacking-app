@@ -24,7 +24,7 @@ data class Picture(
     val rawVersion: String,
     val localPath: String?,
 
-    val travelId: Long,
+    val travelId: Long?,
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),

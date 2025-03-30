@@ -29,9 +29,11 @@ class TravelsFragment : Fragment() {
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
 
     private val viewModel: TravelViewModel by viewModels {
+        val database = BackpakingLocalDataBase.getDatabase(requireContext())
         TravelViewModelFactory(
             TravelRepository(
-                BackpakingLocalDataBase.getDatabase(requireContext()).travelDao(),
+                database.travelDao(),
+                database.pictureDao(),
                 ApiClient.getInstance(requireContext())
             )
         )
@@ -61,17 +63,16 @@ class TravelsFragment : Fragment() {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = TravelAdapter { travel ->
                 // Gérer le clic sur un voyage
-                // Exemple : navigation vers le détail
                 Log.d("TravelsFragment", "Clicked on travel: $travel")
-            } // Remplacez par votre adapteur
+            }
         }
     }
 
     private fun setupObservers() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.travels.collectLatest { travels ->
-                    (binding.recyclerView.adapter as? TravelAdapter)?.submitList(travels)
+                viewModel.travelsWithCoverPictures.collectLatest { travelsWithPictures ->
+                    (binding.recyclerView.adapter as? TravelAdapter)?.submitList(travelsWithPictures)
                     swipeRefreshLayout.isRefreshing = false
                 }
             }
@@ -85,12 +86,12 @@ class TravelsFragment : Fragment() {
                 viewModel.refreshTravels(
                     onComplete = {
                         // Rafraîchissement terminé
-                        // Vous pouvez mettre à jour l'interface utilisateur ici si nécessaire
                         Log.d("TravelsFragment", "Travels refreshed")
                     }
                 )
             } catch (e: Exception) {
                 // Gérer les erreurs ici
+                Log.e("TravelsFragment", "Error refreshing travels", e)
             } finally {
                 swipeRefreshLayout.isRefreshing = false
             }

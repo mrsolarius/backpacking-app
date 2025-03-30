@@ -8,6 +8,7 @@ import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.preference.PreferenceManager
 import fr.louisvolat.R
 import fr.louisvolat.api.ApiClient
 import kotlinx.coroutines.*
@@ -24,6 +25,7 @@ class LoginActivity(private val dispatcherMain: CoroutineDispatcher = Dispatcher
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
+        PreferenceManager.setDefaultValues(this, R.xml.preferences, false)
 
         // Initialiser ApiClient
         apiClient = ApiClient.getInstance(applicationContext)

@@ -2,9 +2,11 @@ package fr.louisvolat.api
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.preference.PreferenceManager
 import com.google.gson.GsonBuilder
 import fr.louisvolat.api.dto.LoginRequest
 import fr.louisvolat.api.dto.LoginResponse
+import fr.louisvolat.api.exception.ErrorInterceptor
 import fr.louisvolat.api.security.SecureTokenManager
 import fr.louisvolat.api.services.AuthService
 import fr.louisvolat.api.services.CoordinateService
@@ -20,15 +22,14 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
+
 /**
  * Gestionnaire pour les services API avec gestion sécurisée du token JWT
  * et repository d'authentification intégré
  */
 class ApiClient private constructor(context: Context) {
     companion object {
-        private const val PREF_NAME = "api_prefs"
         private const val BASE_URL_PREF_NAME = "api_url"
-        private const val DEFAULT_BASE_URL = "http://192.168.25.28:8080" // URL par défaut
 
         // Méthode factory au lieu d'une instance statique
         fun getInstance(context: Context): ApiClient {
@@ -37,44 +38,32 @@ class ApiClient private constructor(context: Context) {
         }
     }
 
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    val context: Context = context.applicationContext
+    private val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
     private val gson = GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").create()
 
     // Gestionnaire sécurisé des tokens
     private val tokenManager = SecureTokenManager.getInstance(context)
 
-    // Service d'authentification (private pour qu'il ne soit accessible que via auth)
-    private val authService: AuthService
+    // Les services sont maintenant recréés à chaque accès
+    val authService: AuthService
+        get() = createPublicRetrofit().create(AuthService::class.java)
 
     // Services publics
     val travelService: TravelService
+        get() = createAuthRetrofit().create(TravelService::class.java)
+
     val coordinateService: CoordinateService
+        get() = createAuthRetrofit().create(CoordinateService::class.java)
+
     val pictureService: PictureService
+        get() = createAuthRetrofit().create(PictureService::class.java)
 
-    // Repository d'authentification intégré
-    val auth: Auth
-
-    init {
-        // Client pour les services qui ne nécessitent pas d'authentification
-        val publicHttpClient = createBaseHttpClient()
-        val publicRetrofit = createRetrofit(publicHttpClient)
-
-        // Client avec intercepteur d'authentification
-        val authHttpClient = createAuthenticatedHttpClient()
-        val authRetrofit = createRetrofit(authHttpClient)
-
-        // Initialisation des services
-        authService = publicRetrofit.create(AuthService::class.java)
-        travelService = authRetrofit.create(TravelService::class.java)
-        coordinateService = authRetrofit.create(CoordinateService::class.java)
-        pictureService = authRetrofit.create(PictureService::class.java)
-
-        // Initialiser le repository d'authentification
-        auth = Auth()
-    }
+    val auth: Auth = Auth()
 
     private fun getBaseUrl(): String {
-        return prefs.getString(BASE_URL_PREF_NAME, DEFAULT_BASE_URL) ?: DEFAULT_BASE_URL
+        return prefs.getString(BASE_URL_PREF_NAME, null)
+            ?: throw IllegalStateException("Base URL not set. Please set it before using the API client.")
     }
 
     private fun createBaseHttpClient(): OkHttpClient {
@@ -93,25 +82,34 @@ class ApiClient private constructor(context: Context) {
     private fun createAuthenticatedHttpClient(): OkHttpClient {
         val authInterceptor = Interceptor { chain ->
             val token = tokenManager.getToken()
-            val newRequest = if (!token.isNullOrEmpty()) {
-                chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $token")
-                    .build()
-            } else {
-                chain.request()
-            }
+            val newRequest = chain.request().newBuilder()
+                .apply {
+                    if (!token.isNullOrEmpty()) {
+                        addHeader("Authorization", "Bearer $token")
+                    }
+                }
+                .build()
             chain.proceed(newRequest)
         }
 
         return createBaseHttpClient().newBuilder()
             .addInterceptor(authInterceptor)
+            .addInterceptor(ErrorInterceptor(context))
             .build()
     }
 
-    private fun createRetrofit(client: OkHttpClient): Retrofit {
+    private fun createPublicRetrofit(): Retrofit {
         return Retrofit.Builder()
             .baseUrl(getBaseUrl())
-            .client(client)
+            .client(createBaseHttpClient())
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+    }
+
+    private fun createAuthRetrofit(): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl(getBaseUrl())
+            .client(createAuthenticatedHttpClient())
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
@@ -153,16 +151,7 @@ class ApiClient private constructor(context: Context) {
         }
     }
 
-    // Méthodes déléguées au SecureTokenManager
-    fun saveToken(token: String) {
-        tokenManager.saveToken(token)
-    }
-
-    fun clearToken() {
-        tokenManager.clearToken()
-    }
-
-    fun isAuthenticated(): Boolean {
-        return tokenManager.isAuthenticated()
-    }
+    fun saveToken(token: String) = tokenManager.saveToken(token)
+    fun clearToken() = tokenManager.clearToken()
+    fun isAuthenticated() = tokenManager.isAuthenticated()
 }
