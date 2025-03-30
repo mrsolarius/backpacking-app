@@ -1,4 +1,4 @@
-package fr.louisvolat.database
+package fr.louisvolat.database.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

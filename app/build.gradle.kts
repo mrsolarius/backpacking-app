@@ -61,13 +61,13 @@ dependencies {
     implementation(libs.squareup.okhttp3.logging)
     //Room
     implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler) // To use Kotlin Symbol Processing (KSP)
+
+    //Gson
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.activity)
     annotationProcessor(libs.androidx.room.compiler)
-
-    // To use Kotlin Symbol Processing (KSP)
-    ksp(libs.androidx.room.compiler)
-
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

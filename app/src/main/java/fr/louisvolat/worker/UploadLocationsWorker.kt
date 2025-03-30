@@ -12,7 +12,7 @@ import androidx.work.WorkerParameters
 import fr.louisvolat.api.dto.CreateCoordinatesRequest
 import fr.louisvolat.api.mapper.CoordinatePostMapper
 import fr.louisvolat.api.services.CoordinateService
-import fr.louisvolat.database.CoordinateDatabase
+import fr.louisvolat.database.BackpakingLocalDataBase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -42,7 +42,7 @@ class UploadLocationsWorker(appContext: Context, workerParams: WorkerParameters)
         }
 
         val lastUpdate = runBlocking { lastUpdateFlow.first() }
-        val coordinatesList = CoordinateDatabase.getDatabase(applicationContext).coordinateDao()
+        val coordinatesList = BackpakingLocalDataBase.getDatabase(applicationContext).coordinateDao()
             .getFromDate(lastUpdate).map(CoordinatePostMapper::mapToDTO)
         if (coordinatesList.isEmpty()) {
             Log.i("UploadLocationsWorker", "No data to send")

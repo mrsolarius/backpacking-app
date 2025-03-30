@@ -1,5 +1,7 @@
 package fr.louisvolat.database
 
+import androidx.room.TypeConverter
+import fr.louisvolat.database.entity.Coordinate
 import java.time.*
 import java.time.format.DateTimeFormatter
 
@@ -85,5 +87,13 @@ class Converter {
                 instant.atZone(ZoneId.systemDefault())
             }
         }
+    }
+
+    @TypeConverter
+    fun fromZonedDateTime(date: ZonedDateTime?): Long? = date?.toInstant()?.toEpochMilli()
+
+    @TypeConverter
+    fun toZonedDateTime(millis: Long?): ZonedDateTime? = millis?.let {
+        Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())
     }
 }

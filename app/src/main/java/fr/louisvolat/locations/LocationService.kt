@@ -16,8 +16,8 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import fr.louisvolat.R
-import fr.louisvolat.database.Coordinate
-import fr.louisvolat.database.CoordinateDatabase
+import fr.louisvolat.database.entity.Coordinate
+import fr.louisvolat.database.BackpakingLocalDataBase
 import fr.louisvolat.worker.UploadLocationsWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit
 class LocationService : Service(), LocationSaver {
 
     private lateinit var locationRequester: LocationRequester
-    private lateinit var database: CoordinateDatabase
+    private lateinit var database: BackpakingLocalDataBase
 
     @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -128,7 +128,7 @@ class LocationService : Service(), LocationSaver {
 
     override fun onCreate() {
         super.onCreate()
-        database = CoordinateDatabase.getDatabase(this)
+        database = BackpakingLocalDataBase.getDatabase(this)
     }
 
     override fun onDestroy() {

@@ -1,8 +1,9 @@
-package fr.louisvolat.database
+package fr.louisvolat.database.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import fr.louisvolat.database.entity.Coordinate
 
 @Dao
 interface CoordinateDao {

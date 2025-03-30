@@ -21,6 +21,7 @@ preference = "1.2.1"
 okhttp = "4.9.3"
 exifinterface = "1.4.0"
 activity = "1.10.1"
+roomKtx = "2.6.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +46,7 @@ squareup-okhttp3-logging = { group = "com.squareup.okhttp3", name = "logging-int
 androidx-preference-ktx = { group = "androidx.preference", name="preference-ktx", version.ref="preference"}
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "roomKtx" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
