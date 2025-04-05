@@ -20,7 +20,7 @@ interface PictureService {
     fun uploadPicture(
         @Path("travelId") travelId: Long,
         @Part picture: MultipartBody.Part
-    ): Call<String>
+    ): Call<PictureDTO>
 
     @POST("/api/travels/{travelId}/pictures/{id}/set-as-cover")
     fun setCoverPicture(

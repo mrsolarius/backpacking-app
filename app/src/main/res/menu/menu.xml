@@ -2,19 +2,19 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/travels"
+        android:id="@+id/travelsFragment"
         android:icon="@drawable/outline_backpack_24"
         android:title="@string/menu_travels" />
     <item
-        android:id="@+id/tracker"
+        android:id="@+id/trackerFragment"
         android:icon="@drawable/outline_my_location_24"
         android:title="@string/menu_tracker" />
     <item
-        android:id="@+id/upload"
+        android:id="@+id/uploadFragment"
         android:icon="@drawable/outline_image_24"
         android:title="@string/menu_upload" />
     <item
-        android:id="@+id/settings"
+        android:id="@+id/settingsDialogFragment"
         android:icon="@drawable/outline_settings_24"
         android:title="@string/menu_settings" />
 </menu>
