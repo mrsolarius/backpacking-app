@@ -1,6 +1,9 @@
 package fr.louisvolat.data.repository
 
+import android.net.Uri
+import android.content.Context
 import fr.louisvolat.api.ApiClient
+import fr.louisvolat.api.dto.CreateTravelRequest
 import fr.louisvolat.data.mapper.PictureMapper
 import fr.louisvolat.data.mapper.TravelMapper
 import fr.louisvolat.database.dao.PictureDao
@@ -9,6 +12,8 @@ import fr.louisvolat.database.entity.TravelWithCoverPicture
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.time.ZonedDateTime
+import fr.louisvolat.api.dto.TravelDTO
 
 class TravelRepository(
     private val travelDao: TravelDao,
@@ -42,14 +47,51 @@ class TravelRepository(
                     val travels = TravelMapper.toEntityList(dtos)
                     val coverPictures = dtos.mapNotNull { it.coverPicture }.let { PictureMapper.toEntityList(it) }
 
-                    pictureDao.insertAll(coverPictures) // Doit être suspendu
-                    travelDao.insertAll(travels) // Doit être suspendu
+                    pictureDao.insertAll(coverPictures)
+                    travelDao.insertAll(travels)
                 }
             } finally {
                 withContext(mainDispatcher) {
                     onComplete()
                 }
             }
+        }
+    }
+
+    // Nouvelle méthode pour créer un voyage
+    suspend fun createTravel(
+        name: String,
+        description: String,
+        startDate: ZonedDateTime,
+        selectedImageUri: Uri? = null,
+        context: Context? = null
+    ): Result<TravelDTO> = withContext(ioDispatcher) {
+        try {
+            val createRequest = CreateTravelRequest.buildTravelRequest(
+                name = name,
+                description = description,
+                startDate = startDate
+            )
+
+            val response = apiClient.travelService.createTravel(createRequest).execute()
+
+            if (response.isSuccessful) {
+                val createdTravel = response.body()
+
+                createdTravel?.let {
+                    // Insérer le voyage dans la BDD locale
+                    val travelEntity = TravelMapper.toEntity(it)
+                    travelDao.insert(travelEntity)
+
+                    // Todo: Associer l'image au voyage
+
+                    Result.success(it)
+                } ?: Result.failure(Exception("Empty response body"))
+            } else {
+                Result.failure(Exception("API error: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 }

@@ -1,6 +1,9 @@
 package fr.louisvolat.api.dto
 
+import java.time.Instant
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 data class TravelDTO(
     val id: Long?,
@@ -19,8 +22,25 @@ data class TravelDTO(
 data class CreateTravelRequest(
     val name: String,
     val description: String,
-    val startDate: ZonedDateTime
-)
+    val startDate: String
+) {
+    companion object {
+        fun convertToISO8601(instant: Instant): String {
+            return DateTimeFormatter.ISO_INSTANT
+                .withZone(ZoneOffset.UTC) // Important: spécifiez le fuseau horaire UTC
+                .format(instant)
+        }
+
+        fun buildTravelRequest(
+            description: String,
+            name: String,
+            startDate: ZonedDateTime
+        ): CreateTravelRequest {
+            val isoDate = convertToISO8601(startDate.toInstant())
+            return CreateTravelRequest(description, name, isoDate)
+        }
+    }
+}
 
 data class UpdateTravelRequest(
     val name: String? = null,

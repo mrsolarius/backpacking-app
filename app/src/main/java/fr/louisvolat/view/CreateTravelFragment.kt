@@ -12,10 +12,16 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.snackbar.Snackbar
 import fr.louisvolat.R
+import fr.louisvolat.api.ApiClient
+import fr.louisvolat.data.repository.TravelRepository
+import fr.louisvolat.data.viewmodel.TravelViewModel
+import fr.louisvolat.data.viewmodel.TravelViewModelFactory
+import fr.louisvolat.database.BackpakingLocalDataBase
 import fr.louisvolat.databinding.FragmentCreateTravelBinding
 import fr.louisvolat.utils.ImageUtils
 import kotlinx.coroutines.launch
@@ -33,6 +39,17 @@ class CreateTravelFragment : Fragment() {
     private var selectedImageUri: Uri? = null
     private var selectedDateTime: ZonedDateTime? = null
     private val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+
+    private val viewModel: TravelViewModel by viewModels {
+        val database = BackpakingLocalDataBase.getDatabase(requireContext())
+        TravelViewModelFactory(
+            TravelRepository(
+                database.travelDao(),
+                database.pictureDao(),
+                ApiClient.getInstance(requireContext())
+            )
+        )
+    }
 
 
     private val pickImage = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -191,9 +208,38 @@ class CreateTravelFragment : Fragment() {
         val name = binding.etTravelName.text.toString().trim()
         val description = binding.etTravelDescription.text.toString().trim()
 
-        viewLifecycleOwner.lifecycleScope.launch {
-            selectedDateTime?.let { date ->
-                // Appel à la méthode de création de voyage
+        // Désactiver le bouton pendant le chargement
+        binding.btnCreateTravel.isEnabled = false
+
+        selectedDateTime?.let { date ->
+            viewModel.createTravel(
+                name = name,
+                description = description,
+                startDate = date,
+                selectedImageUri = selectedImageUri,
+                context = requireContext()
+            )
+        }
+
+        // Observer les résultats
+        viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
+            binding.progressBar.visibility = if (isLoading) View.VISIBLE else View.GONE
+            binding.btnCreateTravel.isEnabled = !isLoading
+        }
+
+        viewModel.error.observe(viewLifecycleOwner) { error ->
+            error?.let {
+                Snackbar.make(binding.root, it, Snackbar.LENGTH_LONG).show()
+                viewModel.resetCreationState()
+            }
+        }
+
+        viewModel.createTravelSuccess.observe(viewLifecycleOwner) { travel ->
+            travel?.let {
+                Toast.makeText(requireContext(), "Voyage créé avec succès!", Toast.LENGTH_SHORT).show()
+                viewModel.resetCreationState()
+                // Naviguer vers le détail du voyage ou la liste des voyages
+                findNavController().navigateUp()
             }
         }
     }
