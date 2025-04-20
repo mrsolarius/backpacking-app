@@ -9,15 +9,7 @@
         android:id="@+id/travelsFragment"
         android:name="fr.louisvolat.view.TravelsFragment"
         android:label="Voyages"
-        tools:layout="@layout/fragment_travels">
-        <action
-            android:id="@+id/action_travels_to_createTravel"
-            app:destination="@id/createTravelFragment"
-            app:enterAnim="@anim/nav_default_enter_anim"
-            app:exitAnim="@anim/nav_default_exit_anim"
-            app:popEnterAnim="@anim/nav_default_pop_enter_anim"
-            app:popExitAnim="@anim/nav_default_pop_exit_anim" />
-    </fragment>
+        tools:layout="@layout/fragment_travels"/>
 
     <fragment
         android:id="@+id/trackerFragment"
@@ -37,13 +29,4 @@
         android:label="Paramètres"
         tools:layout="@layout/fragment_settings_dialog" />
 
-    <fragment
-        android:id="@+id/createTravelFragment"
-        android:name="fr.louisvolat.view.CreateTravelFragment"
-        android:label="Créer un voyage"
-        tools:layout="@layout/fragment_create_travel">
-        <action
-            android:id="@+id/action_createTravel_to_travels"
-            app:destination="@id/travelsFragment" />
-    </fragment>
 </navigation>

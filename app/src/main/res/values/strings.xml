@@ -67,4 +67,5 @@
     <string name="uploading_image">Upload de l\'image en cours…</string>
     <string name="processing_image">Traitement de l\'image…</string>
     <string name="fab_create_travel">Crée votre voyage</string>
+    <string name="create_travel_title">Créer votre voyage</string>
 </resources>

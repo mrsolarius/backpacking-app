@@ -55,6 +55,7 @@ dependencies {
     //Retrofit
     implementation(libs.squareup.retrofit2)
     implementation(libs.squareup.retrofit2.converter.gson)
+    implementation(libs.squareup.retrofit2.converter.scalars)
     //OkHttp
     implementation(libs.squareup.okhttp3)
     // OkHttp Logging Interceptor

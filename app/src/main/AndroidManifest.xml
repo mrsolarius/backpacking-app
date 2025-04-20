@@ -28,6 +28,11 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".view.CreateTravelActivity"
+            android:exported="false"
+            android:label="@string/create_travel_title"
+            android:windowSoftInputMode="adjustResize"  />
         <service
             android:name=".locations.LocationService"
             android:foregroundServiceType="location"/>

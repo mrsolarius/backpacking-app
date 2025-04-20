@@ -20,6 +20,7 @@ import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
 
 
@@ -40,7 +41,7 @@ class ApiClient private constructor(context: Context) {
 
     val context: Context = context.applicationContext
     private val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
-    private val gson = GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").create()
+    private val gson = GsonBuilder().setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").setLenient().create()
 
     // Gestionnaire sécurisé des tokens
     private val tokenManager = SecureTokenManager.getInstance(context)
@@ -111,6 +112,7 @@ class ApiClient private constructor(context: Context) {
             .baseUrl(getBaseUrl())
             .client(createAuthenticatedHttpClient())
             .addConverterFactory(GsonConverterFactory.create(gson))
+            .addConverterFactory(ScalarsConverterFactory.create())
             .build()
     }
 

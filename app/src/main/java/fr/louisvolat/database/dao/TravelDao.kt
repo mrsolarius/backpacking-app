@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import fr.louisvolat.database.entity.Travel
 import fr.louisvolat.database.entity.TravelWithCoverPicture
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +17,9 @@ interface TravelDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(travel: Travel)
+
+    @Update
+    suspend fun update(travel: Travel)
 
     @Query("SELECT * FROM travels WHERE id = :id")
     suspend fun getById(id: Long): Travel?

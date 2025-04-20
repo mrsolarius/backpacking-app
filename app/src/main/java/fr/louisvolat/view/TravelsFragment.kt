@@ -13,6 +13,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import fr.louisvolat.api.ApiClient
+import fr.louisvolat.data.repository.PictureRepository
 import fr.louisvolat.data.repository.TravelRepository
 import fr.louisvolat.data.viewmodel.TravelViewModel
 import fr.louisvolat.data.viewmodel.TravelViewModelFactory
@@ -30,11 +31,16 @@ class TravelsFragment : Fragment() {
 
     private val viewModel: TravelViewModel by viewModels {
         val database = BackpakingLocalDataBase.getDatabase(requireContext())
+        val pictureRepository = PictureRepository(
+            database.pictureDao(),
+            ApiClient.getInstance(requireContext()),
+        )
         TravelViewModelFactory(
             TravelRepository(
                 database.travelDao(),
                 database.pictureDao(),
-                ApiClient.getInstance(requireContext())
+                ApiClient.getInstance(requireContext()),
+                pictureRepository
             )
         )
     }
@@ -79,7 +85,7 @@ class TravelsFragment : Fragment() {
         }
     }
 
-    private fun refreshData() {
+    fun refreshData() {
         swipeRefreshLayout.isRefreshing = true
         viewLifecycleOwner.lifecycleScope.launch {
             try {

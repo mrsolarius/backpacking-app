@@ -19,4 +19,19 @@ object PictureMapper : AbstractMapper<PictureDTO, Picture>() {
         )
     }
 
+    fun toEntityWithLocalPathAndTravelId(dto: PictureDTO, localPath: String, travelId: Long): Picture {
+        return Picture(
+            id = dto.id ?: 0,
+            latitude = dto.latitude,
+            longitude = dto.longitude,
+            altitude = dto.altitude,
+            date = parseDateToTimestamp(dto.createdAt),
+            rawVersion = dto.path,
+            localPath = localPath,
+            travelId = travelId,
+            createdAt = parseDateToTimestamp(dto.createdAt),
+            updatedAt = parseDateToTimestamp(dto.updatedAt)
+        )
+    }
+
 }

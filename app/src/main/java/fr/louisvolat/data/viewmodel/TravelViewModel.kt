@@ -47,14 +47,21 @@ class TravelViewModel(private val repository: TravelRepository) : ViewModel() {
 
         viewModelScope.launch {
             try {
-                val result = repository.createTravel(
-                    name = name,
-                    description = description,
-                    startDate = startDate,
-                    selectedImageUri = selectedImageUri,
-                    context = context
-                )
-
+                val result = if (selectedImageUri == null || context == null) {
+                    repository.createTravel(
+                        name = name,
+                        description = description,
+                        startDate = startDate
+                    )
+                } else {
+                    repository.createTravelWithCoverPicture(
+                        name = name,
+                        description = description,
+                        startDate = startDate,
+                        selectedImageUri = selectedImageUri,
+                        context = context
+                    )
+                }
                 result.fold(
                     onSuccess = { travel ->
                         _createTravelSuccess.value = travel

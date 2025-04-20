@@ -1,5 +1,6 @@
 package fr.louisvolat.view
 
+import android.app.Activity
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
@@ -14,10 +15,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import com.google.android.material.snackbar.Snackbar
 import fr.louisvolat.R
 import fr.louisvolat.api.ApiClient
+import fr.louisvolat.data.repository.PictureRepository
 import fr.louisvolat.data.repository.TravelRepository
 import fr.louisvolat.data.viewmodel.TravelViewModel
 import fr.louisvolat.data.viewmodel.TravelViewModelFactory
@@ -42,39 +43,45 @@ class CreateTravelFragment : Fragment() {
 
     private val viewModel: TravelViewModel by viewModels {
         val database = BackpakingLocalDataBase.getDatabase(requireContext())
+        val pictureRepository = PictureRepository(
+            database.pictureDao(),
+            ApiClient.getInstance(requireContext()),
+        ) // Create the instance
         TravelViewModelFactory(
             TravelRepository(
                 database.travelDao(),
                 database.pictureDao(),
-                ApiClient.getInstance(requireContext())
+                ApiClient.getInstance(requireContext()),
+                pictureRepository // Pass it to TravelRepository
             )
         )
     }
 
+    private val pickImage =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.data?.let { uri ->
+                    selectedImageUri = uri
 
-    private val pickImage = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            result.data?.data?.let { uri ->
-                selectedImageUri = uri
-
-                // Vérifier si l'image contient des coordonnées GPS
-                lifecycleScope.launch {
-                    if (ImageUtils.hasGpsCoordinates(requireContext(), uri)) {
-                        binding.ivCoverPicture.setImageURI(uri)
-                        binding.tvCoverPictureLabel.text = getString(R.string.cover_picture_selected)
-                        binding.ivCoverPicture.visibility = View.VISIBLE
-                    } else {
-                        selectedImageUri = null
-                        Snackbar.make(
-                            binding.root,
-                            getString(R.string.error_image_no_gps),
-                            Snackbar.LENGTH_LONG
-                        ).show()
+                    // Vérifier si l'image contient des coordonnées GPS
+                    lifecycleScope.launch {
+                        if (ImageUtils.hasGpsCoordinates(requireContext(), uri)) {
+                            binding.ivCoverPicture.setImageURI(uri)
+                            binding.tvCoverPictureLabel.text =
+                                getString(R.string.cover_picture_selected)
+                            binding.ivCoverPicture.visibility = View.VISIBLE
+                        } else {
+                            selectedImageUri = null
+                            Snackbar.make(
+                                binding.root,
+                                getString(R.string.error_image_no_gps),
+                                Snackbar.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 }
             }
         }
-    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -112,7 +119,8 @@ class CreateTravelFragment : Fragment() {
 
         // Bouton d'annulation
         binding.btnCancel.setOnClickListener {
-            findNavController().navigateUp()
+            // Fermer l'activity parente
+            activity?.finish()
         }
     }
 
@@ -236,10 +244,12 @@ class CreateTravelFragment : Fragment() {
 
         viewModel.createTravelSuccess.observe(viewLifecycleOwner) { travel ->
             travel?.let {
-                Toast.makeText(requireContext(), "Voyage créé avec succès!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Voyage créé avec succès!", Toast.LENGTH_SHORT)
+                    .show()
                 viewModel.resetCreationState()
-                // Naviguer vers le détail du voyage ou la liste des voyages
-                findNavController().navigateUp()
+                // Fermer l'activity au lieu de naviguer en arrière
+                activity?.setResult(Activity.RESULT_OK)
+                activity?.finish()
             }
         }
     }
