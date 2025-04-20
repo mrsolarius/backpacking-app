@@ -50,7 +50,7 @@ class LocationService : Service(), LocationSaver {
             .setContentText(getString(R.string.tracking_running))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setColor(ContextCompat.getColor(applicationContext,R.color.green))
+            .setColor(ContextCompat.getColor(applicationContext,R.color.md_theme_surfaceContainerLow))
             .setColorized(true)
             .addAction(
                 R.drawable.ic_launcher_foreground,

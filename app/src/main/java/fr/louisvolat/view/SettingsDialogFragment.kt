@@ -11,7 +11,7 @@ class SettingsDialogFragment : DialogFragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setStyle(STYLE_NORMAL, R.style.FullScreenDialogStyle)
+        setStyle(STYLE_NORMAL, R.style.Backpacking_FullScreenDialog)
     }
 
     override fun onCreateView(
