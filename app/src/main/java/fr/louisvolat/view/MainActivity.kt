@@ -2,9 +2,10 @@ package fr.louisvolat.view
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
+import android.view.animation.AnimationUtils
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityOptionsCompat
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
@@ -53,11 +54,36 @@ class MainActivity : AppCompatActivity() {
             launchCreateTravelActivity()
         }
 
-        navController.addOnDestinationChangedListener { _, _, _ ->
-            // Vous pouvez supprimer la référence à createTravelFragment
-            // puisqu'il sera dans une Activity séparée maintenant
-            binding.fab.show()
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            when (destination.id) {
+                R.id.trackerFragment, R.id.settingsFragment -> { // Remplace par les IDs de tes fragments
+                    hideFab()
+                }
+                else -> {
+                    showFab()
+                }
+            }
         }
+    }
+
+    private fun showFab() {
+        binding.fab.apply {
+            visibility = View.VISIBLE
+            val animation = AnimationUtils.loadAnimation(context, R.anim.fab_show)
+            startAnimation(animation)
+        }
+    }
+
+    fun hideFab() {
+        val animation = AnimationUtils.loadAnimation(binding.fab.context, R.anim.fab_hide)
+        animation.setAnimationListener(object : android.view.animation.Animation.AnimationListener {
+            override fun onAnimationStart(animation: android.view.animation.Animation?) {}
+            override fun onAnimationEnd(animation: android.view.animation.Animation?) {
+                binding.fab.visibility = View.GONE
+            }
+            override fun onAnimationRepeat(animation: android.view.animation.Animation?) {}
+        })
+        binding.fab.startAnimation(animation)
     }
 
     // Nouvelle méthode pour lancer l'activity de création
