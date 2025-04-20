@@ -14,7 +14,7 @@
         android:icon="@drawable/outline_image_24"
         android:title="@string/menu_upload" />
     <item
-        android:id="@+id/settingsDialogFragment"
+        android:id="@+id/settingsFragment"
         android:icon="@drawable/outline_settings_24"
         android:title="@string/menu_settings" />
 </menu>
