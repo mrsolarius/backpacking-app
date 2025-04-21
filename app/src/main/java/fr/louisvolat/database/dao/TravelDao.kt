@@ -1,5 +1,6 @@
 package fr.louisvolat.database.dao
 
+import androidx.lifecycle.LiveData
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -20,6 +21,9 @@ interface TravelDao {
 
     @Update
     suspend fun update(travel: Travel)
+
+    @Query("SELECT * FROM travels WHERE id = :id")
+    fun getByIdLive(id: Long): LiveData<Travel>
 
     @Query("SELECT * FROM travels WHERE id = :id")
     suspend fun getById(id: Long): Travel?

@@ -68,4 +68,6 @@
     <string name="processing_image">Traitement de l\'image…</string>
     <string name="fab_create_travel">Crée votre voyage</string>
     <string name="create_travel_title">Créer votre voyage</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>

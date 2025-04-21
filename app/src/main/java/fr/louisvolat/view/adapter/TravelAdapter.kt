@@ -1,6 +1,7 @@
 package fr.louisvolat.view.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.preference.PreferenceManager
@@ -16,8 +17,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class TravelAdapter(
-    private val onItemClick: (Travel) -> Unit
-) : ListAdapter<TravelWithCoverPicture, TravelAdapter.TravelViewHolder>(TravelDiffCallback()) {
+    private val onItemClick: (Travel, View) -> Unit
+) : ListAdapter<TravelWithCoverPicture, TravelAdapter.TravelViewHolder>(TravelDiffCallback())  {
     private lateinit var apiUrl: String
     private val BASE_URL_PREF_NAME = "api_url"
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TravelViewHolder {
@@ -82,8 +83,13 @@ class TravelAdapter(
                     travelCoverImage.isVisible = false
                 }
 
-                // Gestion du clic
-                root.setOnClickListener { onItemClick(travel) }
+                // Setup pour la transition partagée
+                travelName.transitionName = "travel_name_transition_${travel.id}"
+
+                // Gestion du clic avec les extras pour la transition
+                root.setOnClickListener {
+                    onItemClick(travel, travelName)
+                }
             }
         }
     }

@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/travelsFragment"
+        android:id="@+id/travelDetailFragment"
         android:icon="@drawable/outline_backpack_24"
         android:title="@string/menu_travels" />
     <item

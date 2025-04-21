@@ -15,6 +15,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import com.google.android.material.snackbar.Snackbar
 import fr.louisvolat.R
 import fr.louisvolat.api.ApiClient
@@ -120,7 +121,7 @@ class CreateTravelFragment : Fragment() {
         // Bouton d'annulation
         binding.btnCancel.setOnClickListener {
             // Fermer l'activity parente
-            activity?.finish()
+            findNavController().popBackStack()
         }
     }
 
@@ -248,8 +249,7 @@ class CreateTravelFragment : Fragment() {
                     .show()
                 viewModel.resetCreationState()
                 // Fermer l'activity au lieu de naviguer en arrière
-                activity?.setResult(Activity.RESULT_OK)
-                activity?.finish()
+                findNavController().popBackStack()
             }
         }
     }

@@ -2,6 +2,7 @@ package fr.louisvolat.data.repository
 
 import android.net.Uri
 import android.content.Context
+import androidx.lifecycle.LiveData
 import fr.louisvolat.api.ApiClient
 import fr.louisvolat.api.dto.CreateTravelRequest
 import fr.louisvolat.data.mapper.PictureMapper
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.time.ZonedDateTime
 import fr.louisvolat.api.dto.TravelDTO
+import fr.louisvolat.database.entity.Travel
 
 class TravelRepository(
     private val travelDao: TravelDao,
@@ -156,5 +158,9 @@ class TravelRepository(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    fun getTravelById(travelId: Long): LiveData<Travel> {
+        return travelDao.getByIdLive(travelId)
     }
 }

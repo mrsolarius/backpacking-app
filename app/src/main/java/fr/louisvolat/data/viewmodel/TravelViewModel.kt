@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import fr.louisvolat.api.dto.TravelDTO
 import fr.louisvolat.data.repository.TravelRepository
+import fr.louisvolat.database.entity.Travel
 import fr.louisvolat.database.entity.TravelWithCoverPicture
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -83,4 +84,9 @@ class TravelViewModel(private val repository: TravelRepository) : ViewModel() {
         _createTravelSuccess.value = null
         _error.value = null
     }
+
+    fun getTravelById(travelId: Long): LiveData<Travel> {
+        return repository.getTravelById(travelId)
+    }
+
 }

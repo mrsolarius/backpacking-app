@@ -3,13 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/travelsFragment">
+    app:startDestination="@id/travelDetailFragment">
 
     <fragment
-        android:id="@+id/travelsFragment"
-        android:name="fr.louisvolat.view.TravelsFragment"
-        android:label="Voyages"
-        tools:layout="@layout/fragment_travels"/>
+        android:id="@+id/travelDetailFragment"
+        android:name="fr.louisvolat.view.TravelDetailFragment"
+        android:label="Accueil"
+        tools:layout="@layout/fragment_travel_detail" />
 
     <fragment
         android:id="@+id/trackerFragment"
