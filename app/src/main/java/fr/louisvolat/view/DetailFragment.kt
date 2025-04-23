@@ -7,7 +7,9 @@ import android.view.ViewGroup
 import android.view.animation.AnimationUtils
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.navigation.NavArgument
 import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
 import fr.louisvolat.R
@@ -95,8 +97,14 @@ class DetailFragment : Fragment() {
         val navHostFragment = childFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         navController = navHostFragment.navController
 
-        setupNavigation()
+        val navGraph = navController.navInflater.inflate(R.navigation.bottom_nav_graph)
+        navGraph.addArgument("travelId", NavArgument.Builder()
+            .setType(NavType.LongType)
+            .setDefaultValue(travelId)
+            .build())
+        navController.graph = navGraph
 
+        setupNavigation()
         setupFab()
     }
 
@@ -109,11 +117,11 @@ class DetailFragment : Fragment() {
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
             when (destination.id) {
-                R.id.trackerFragment, R.id.settingsFragment -> { // Remplace par les IDs de tes fragments
-                    hideFab()
+                R.id.uploadFragment -> { // Remplace par les IDs de tes fragments
+                    showFab()
                 }
                 else -> {
-                    showFab()
+                    hideFab()
                 }
             }
         }

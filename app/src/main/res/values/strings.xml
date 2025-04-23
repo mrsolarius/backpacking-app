@@ -14,8 +14,17 @@
     <string name="track_disable">Tracking désactivé</string>
     <string name="permission_denied">Permision non accorder</string>
     <string name="location_service_channel">Tracker de positions</string>
-    <string name="stop_tracking_notif">Arreter le tracking</string>
+    <string name="stop_tracking_notif">Arreter</string>
+    <string name="pause_tracking_notif">Pause</string>
+    <string name="resume_tracking_notif">Reprendre</string>
+    <string name="tracking_status">Statut du tracking</string>
+    <string name="tracking_stopped">Tracking arrêté</string>
+    <string name="elapsed_time">Temps écoulé</string>
+    <string name="pause_tracking">Mettre en pause</string>
+    <string name="resume_tracking">Reprendre</string>
+    <string name="stop_tracking">Arrêter</string>
     <string name="tracking_running">Tracking en cours…</string>
+    <string name="tracking_paused">Tracking en pause…</string>
     <string name="send_data">Envoyer les données</string>
     <string name="no_data_to_send">Aucune données à envoyer</string>
     <string name="edit_api_preferance">Changer l\'URL de l\'API</string>
@@ -70,4 +79,6 @@
     <string name="create_travel_title">Créer votre voyage</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="defaultTimer">00:00:00</string>
+
 </resources>

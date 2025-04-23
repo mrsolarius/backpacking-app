@@ -5,28 +5,46 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/travelDetailFragment">
 
+    <!-- Déclarer l'argument au niveau du graphe -->
+    <argument
+        android:name="travelId"
+        app:argType="long"
+        android:defaultValue="-1L" />
+
     <fragment
         android:id="@+id/travelDetailFragment"
         android:name="fr.louisvolat.view.TravelDetailFragment"
         android:label="Accueil"
-        tools:layout="@layout/fragment_travel_detail" />
+        tools:layout="@layout/fragment_travel_detail">
+        <argument
+            android:name="travelId"
+            app:argType="long" />
+    </fragment>
 
     <fragment
         android:id="@+id/trackerFragment"
         android:name="fr.louisvolat.view.TrackerFragment"
         android:label="Tracker"
-        tools:layout="@layout/fragment_tracker" />
+        tools:layout="@layout/fragment_tracker">
+        <argument
+            android:name="travelId"
+            app:argType="long" />
+    </fragment>
 
     <fragment
         android:id="@+id/uploadFragment"
         android:name="fr.louisvolat.view.UploadFragment"
         android:label="Upload"
-        tools:layout="@layout/fragment_upload" />
+        tools:layout="@layout/fragment_upload">
+        <argument
+            android:name="travelId"
+            app:argType="long" />
+    </fragment>
 
     <fragment
         android:id="@+id/settingsFragment"
         android:name="fr.louisvolat.view.SettingsFragment"
         android:label="Paramètres"
-        tools:layout="@layout/fragment_settings_dialog" />
-
+        tools:layout="@layout/fragment_settings_dialog">
+    </fragment>
 </navigation>

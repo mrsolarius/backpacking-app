@@ -13,7 +13,8 @@ data class Coordinate(
     val longitude: Double,
     val altitude: Double,
     val timeZoneId: String, // Identifiant du fuseau horaire (ex: "Europe/Paris")
-    val timeZoneOffsetSeconds: Int // Décalage en secondes par rapport à UTC au moment de l'enregistrement
+    val timeZoneOffsetSeconds: Int, // Décalage en secondes par rapport à UTC
+    val travelId: Long // ID du voyage associé
 ) {
     // Obtenir un ZonedDateTime avec le fuseau horaire original
     fun toZonedDateTime(): ZonedDateTime {
@@ -34,7 +35,8 @@ data class Coordinate(
             timestamp: Long,
             latitude: Double,
             longitude: Double,
-            altitude: Double
+            altitude: Double,
+            travelId: Long
         ): Coordinate {
             val zoneId = ZoneId.systemDefault()
             val instant = Instant.ofEpochMilli(timestamp)
@@ -47,7 +49,8 @@ data class Coordinate(
                 longitude = longitude,
                 altitude = altitude,
                 timeZoneId = zoneId.id,
-                timeZoneOffsetSeconds = offsetSeconds
+                timeZoneOffsetSeconds = offsetSeconds,
+                travelId = travelId
             )
         }
     }
