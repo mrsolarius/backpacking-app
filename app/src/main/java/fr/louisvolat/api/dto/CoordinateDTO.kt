@@ -1,7 +1,5 @@
 package fr.louisvolat.api.dto
 
-import java.time.ZonedDateTime
-
 data class CoordinateListPostDTO(
     val coordinates: List<CreateCoordinateRequest>
 )
@@ -18,7 +16,7 @@ data class CoordinateDTO(
 data class CreateCoordinateRequest(
     val latitude: String,
     val longitude: String,
-    val date: ZonedDateTime
+    val date: String
 )
 
 data class CreateCoordinatesRequest(
@@ -27,6 +25,6 @@ data class CreateCoordinatesRequest(
 
 data class CreateCoordinateResponseConfirm(
     val savedCoordinate: Long,
-    val startDate: ZonedDateTime,
-    val endDate: ZonedDateTime
+    val startDate: String,
+    val endDate: String
 )

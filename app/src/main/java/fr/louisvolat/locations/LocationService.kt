@@ -20,8 +20,11 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import fr.louisvolat.R
+import fr.louisvolat.api.ApiClient
+import fr.louisvolat.data.repository.CoordinateRepository
+import fr.louisvolat.data.viewmodel.CoordinateViewModel
+import fr.louisvolat.data.viewmodel.CoordinateViewModelFactory
 import fr.louisvolat.database.BackpakingLocalDataBase
-import fr.louisvolat.database.entity.Coordinate
 import fr.louisvolat.view.MainActivity
 import fr.louisvolat.worker.UploadLocationsWorker
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +39,7 @@ class LocationService : LifecycleService(), LocationSaver {
 
     private lateinit var locationRequester: LocationRequester
     private lateinit var database: BackpakingLocalDataBase
+    private lateinit var coordinateViewModel: CoordinateViewModel
     private var serviceScope = CoroutineScope(Dispatchers.Default)
     private var timerJob: Job? = null
     private var travelId: Long = -1
@@ -334,6 +338,13 @@ class LocationService : LifecycleService(), LocationSaver {
     override fun onCreate() {
         super.onCreate()
         database = BackpakingLocalDataBase.getDatabase(this)
+
+        // Initialisation du repository et du ViewModel
+        val coordinateDao = database.coordinateDao()
+        val apiClient = ApiClient.getInstance(this)
+        val coordinateRepository = CoordinateRepository(coordinateDao, apiClient)
+        coordinateViewModel = CoordinateViewModelFactory(coordinateRepository).create(CoordinateViewModel::class.java)
+
     }
 
     override fun onDestroy() {
@@ -346,15 +357,8 @@ class LocationService : LifecycleService(), LocationSaver {
     }
 
     override fun saveLocation(latitude: Double, longitude: Double, altitude: Double, time: Long) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val coordinate = Coordinate.createWithCurrentTimeZone(
-                timestamp = time,
-                latitude = latitude,
-                longitude = longitude,
-                altitude = altitude,
-                travelId = travelId
-            )
-            database.coordinateDao().insert(coordinate)
+        if (travelId != -1L) {
+            coordinateViewModel.saveCoordinate(latitude, longitude, altitude, time, travelId)
 
             // Notifier le SharedTrackingManager de la nouvelle localisation
             SharedTrackingManager.processAction(

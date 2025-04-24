@@ -1,6 +1,5 @@
 package fr.louisvolat.data.repository
 
-import android.content.Context
 import fr.louisvolat.api.ApiClient
 import fr.louisvolat.api.dto.CoordinateDTO
 import fr.louisvolat.api.dto.CreateCoordinateResponseConfirm
@@ -18,7 +17,6 @@ import java.time.Instant
 class CoordinateRepository(
     private val coordinateDao: CoordinateDao,
     private val apiClient: ApiClient,
-    private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     // Récupérer toutes les coordonnées en local
@@ -55,8 +53,8 @@ class CoordinateRepository(
                     return@withContext Result.success(
                         CreateCoordinateResponseConfirm(
                             savedCoordinate = 0,
-                            startDate = Instant.now().atZone(java.time.ZoneId.systemDefault()),
-                            endDate = Instant.now().atZone(java.time.ZoneId.systemDefault())
+                            startDate = Instant.now().atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+                            endDate = Instant.now().atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME)
                         )
                     )
                 }
