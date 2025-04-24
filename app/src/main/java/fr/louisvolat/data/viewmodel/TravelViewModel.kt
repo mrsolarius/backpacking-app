@@ -26,6 +26,9 @@ class TravelViewModel(private val repository: TravelRepository) : ViewModel() {
     private val _createTravelSuccess = MutableLiveData<TravelDTO?>()
     val createTravelSuccess: LiveData<TravelDTO?> = _createTravelSuccess
 
+    private val _selectedTravelId = MutableLiveData<Long>(-1L)
+    val selectedTravelId: LiveData<Long> = _selectedTravelId
+
     // Récupérer directement les voyages avec leurs images de couverture
     val travelsWithCoverPictures: StateFlow<List<TravelWithCoverPicture>> = repository.getAllTravelsWithCoverPictures()
 
@@ -87,6 +90,10 @@ class TravelViewModel(private val repository: TravelRepository) : ViewModel() {
 
     fun getTravelById(travelId: Long): LiveData<Travel> {
         return repository.getTravelById(travelId)
+    }
+
+    fun setSelectedTravel(travelId: Long) {
+        _selectedTravelId.value = travelId
     }
 
 }

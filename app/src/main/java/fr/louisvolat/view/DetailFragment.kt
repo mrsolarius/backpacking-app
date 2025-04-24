@@ -7,9 +7,11 @@ import android.view.ViewGroup
 import android.view.animation.AnimationUtils
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavArgument
 import androidx.navigation.NavController
 import androidx.navigation.NavType
+import androidx.navigation.fragment.FragmentNavigator
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
 import fr.louisvolat.R
@@ -31,21 +33,7 @@ class DetailFragment : Fragment() {
     // NavController de ce fragment
     private lateinit var navController: NavController
 
-    private val viewModel: TravelViewModel by viewModels {
-        val database = BackpakingLocalDataBase.getDatabase(requireContext())
-        val pictureRepository = PictureRepository(
-            database.pictureDao(),
-            ApiClient.getInstance(requireContext()),
-        ) // Create the instance
-        TravelViewModelFactory(
-            TravelRepository(
-                database.travelDao(),
-                database.pictureDao(),
-                ApiClient.getInstance(requireContext()),
-                pictureRepository // Pass it to TravelRepository
-            )
-        )
-    }
+    private lateinit var viewModel: TravelViewModel
 
     private fun setupBottomNavAnimations() {
         // Animer l'apparition du bottom nav
@@ -72,6 +60,23 @@ class DetailFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        val database = BackpakingLocalDataBase.getDatabase(requireContext())
+        val pictureRepository = PictureRepository(
+            database.pictureDao(),
+            ApiClient.getInstance(requireContext()),
+        )
+        viewModel = ViewModelProvider(
+            requireActivity(),
+            TravelViewModelFactory(
+                TravelRepository(
+                    database.travelDao(),
+                    database.pictureDao(),
+                    ApiClient.getInstance(requireContext()),
+                    pictureRepository
+                )
+            )
+        )[TravelViewModel::class.java]
+
         // Activer les transitions partagées
         postponeEnterTransition()
 
@@ -79,6 +84,8 @@ class DetailFragment : Fragment() {
         val travelId = arguments?.getLong("travelId") ?: -1L
 
         if (travelId != -1L) {
+            // Stocker l'ID dans le ViewModel
+            viewModel.setSelectedTravel(travelId)
             // Charger les détails du voyage
             viewModel.getTravelById(travelId).observe(viewLifecycleOwner) { travel ->
                 // Mettre à jour le titre dans la toolbar
@@ -87,6 +94,7 @@ class DetailFragment : Fragment() {
                 // Démarrer la transition différée
                 startPostponedEnterTransition()
             }
+
         } else {
             startPostponedEnterTransition()
         }
@@ -98,10 +106,6 @@ class DetailFragment : Fragment() {
         navController = navHostFragment.navController
 
         val navGraph = navController.navInflater.inflate(R.navigation.bottom_nav_graph)
-        navGraph.addArgument("travelId", NavArgument.Builder()
-            .setType(NavType.LongType)
-            .setDefaultValue(travelId)
-            .build())
         navController.graph = navGraph
 
         setupNavigation()
