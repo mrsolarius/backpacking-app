@@ -26,9 +26,6 @@
         android:name="fr.louisvolat.view.TrackerFragment"
         android:label="Tracker"
         tools:layout="@layout/fragment_tracker">
-        <argument
-            android:name="travelId"
-            app:argType="long" />
     </fragment>
 
     <fragment
@@ -36,9 +33,6 @@
         android:name="fr.louisvolat.view.UploadFragment"
         android:label="Upload"
         tools:layout="@layout/fragment_upload">
-        <argument
-            android:name="travelId"
-            app:argType="long" />
     </fragment>
 
     <fragment

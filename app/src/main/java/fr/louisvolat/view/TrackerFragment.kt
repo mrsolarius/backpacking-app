@@ -1,10 +1,7 @@
 package fr.louisvolat.view
 
 import android.Manifest
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -15,21 +12,30 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fr.louisvolat.R
+import fr.louisvolat.api.ApiClient
+import fr.louisvolat.data.repository.PictureRepository
+import fr.louisvolat.data.repository.TrackingRepositoryProvider
+import fr.louisvolat.data.repository.TravelRepository
+import fr.louisvolat.data.viewmodel.TrackingViewModel
+import fr.louisvolat.data.viewmodel.TrackingViewModelFactory
+import fr.louisvolat.data.viewmodel.TravelViewModel
+import fr.louisvolat.data.viewmodel.TravelViewModelFactory
+import fr.louisvolat.database.BackpakingLocalDataBase
 import fr.louisvolat.databinding.FragmentTrackerBinding
 import fr.louisvolat.locations.LocationService
-import fr.louisvolat.locations.SharedTrackingManager
 import fr.louisvolat.locations.TrackingState
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
 
 class TrackerFragment : Fragment() {
     private var _binding: FragmentTrackerBinding? = null
@@ -37,36 +43,103 @@ class TrackerFragment : Fragment() {
     private lateinit var buttonTrack: Button
     private lateinit var buttonSend: Button
     private lateinit var buttonStop: Button
-    private var tracking = false
 
-//    private val viewModel: LocationTrackingViewModel by viewModels {
-//        val database = BackpakingLocalDataBase.getDatabase(requireContext())
-//        val coordinateRepository = CoordinateRepository(
-//            database.coordinateDao(),
-//            ApiClient.getInstance(requireContext()),
-//            requireContext()
-//        )
-//        LocationTrackingViewModelFactory(
-//            coordinateRepository,
-//            requireActivity().application
-//        )
-//    }
+    private lateinit var travelViewModel: TravelViewModel
+    private var travelId: Long = -1
 
-    // Les récepteurs sont toujours nécessaires pour certains événements spécifiques
-    private var trackingUpdateReceiver: BroadcastReceiver? = null
+    // Référence au ViewModel
+    private lateinit var trackingViewModel: TrackingViewModel
+
+    // Lanceurs pour les permissions
+    private lateinit var locationPermissionRequest: ActivityResultLauncher<Array<String>>
+    private lateinit var notificationPermissionRequest: ActivityResultLauncher<String>
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Initialiser les lanceurs pour les permissions
+        registerPermissionLaunchers()
+    }
+
+    private fun registerPermissionLaunchers() {
+        // Lanceur pour les permissions de localisation
+        locationPermissionRequest = registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            val fineLocationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+            val coarseLocationGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+
+            if (fineLocationGranted || coarseLocationGranted) {
+                // Vérifier si la permission de notification est nécessaire
+                checkNotificationPermission()
+            } else {
+                // Les permissions de localisation ont été refusées
+                if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                    shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    showPermissionExplanationDialog()
+                } else {
+                    showPermissionSettingsDialog()
+                }
+            }
+        }
+
+        // Lanceur pour la permission de notification
+        notificationPermissionRequest = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+            if (isGranted) {
+                // Toutes les permissions sont accordées, démarrer le tracking
+                proceedWithTracking()
+            } else {
+                // La permission de notification a été refusée
+                if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                    showPermissionExplanationDialog()
+                } else {
+                    showPermissionSettingsDialog()
+                }
+            }
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        super.onCreate(savedInstanceState)
         _binding = FragmentTrackerBinding.inflate(inflater, container, false)
+
+        // Initialiser le ViewModel de voyage
+        val database = BackpakingLocalDataBase.getDatabase(requireContext())
+        val pictureRepository = PictureRepository(
+            database.pictureDao(),
+            ApiClient.getInstance(requireContext()),
+        )
+        travelViewModel = ViewModelProvider(
+            requireActivity(),
+            TravelViewModelFactory(
+                TravelRepository(
+                    database.travelDao(),
+                    database.pictureDao(),
+                    ApiClient.getInstance(requireContext()),
+                    pictureRepository
+                )
+            )
+        )[TravelViewModel::class.java]
 
         // Initialiser les boutons
         buttonTrack = binding.buttonTrack
         buttonStop = binding.buttonStop
         buttonSend = binding.buttonSendData
+
+        // Utiliser l'instance partagée du repository
+        val trackingRepository = TrackingRepositoryProvider.getInstance(requireContext())
+        val factory = TrackingViewModelFactory(trackingRepository)
+        trackingViewModel = ViewModelProvider(this, factory)[TrackingViewModel::class.java]
+
+        travelViewModel.selectedTravelId.observe(viewLifecycleOwner) { id ->
+            travelId = id
+            Log.d("TrackerFragment", "TravelId mis à jour: $travelId")
+        }
 
         // Configurer les listeners initiaux
         buttonTrack.setOnClickListener { startTracking() }
@@ -77,25 +150,46 @@ class TrackerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Observer les changements d'état via le SharedTrackingManager
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+        setupObservers()
+
+        // Observer les erreurs
+        trackingViewModel.error.observe(viewLifecycleOwner) { error ->
+            error?.let {
+                Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun setupObservers() {
+        // IMPORTANT: Utiliser repeatOnLifecycle pour garantir la collecte appropriée
+        viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                SharedTrackingManager.trackingUpdates.collect { state ->
-                    updateUI(state)
+                // 1. Collecter les changements d'état généraux pour mettre à jour l'UI
+                launch {
+                    trackingViewModel.trackingState.collectLatest { state ->
+                        Log.d("TrackerFragment", "État général mis à jour: ${state.isTracking}, ${state.isPaused}")
+                        updateUI(state)
+                    }
+                }
+
+                // 2. Collecter spécifiquement les mises à jour du timer pour le temps écoulé
+                // Utiliser collectLatest garantit que nous recevons toujours la dernière valeur
+                launch {
+                    trackingViewModel.timerUpdates.collectLatest { state ->
+                        Log.d("TrackerFragment", "Mise à jour timer: ${state.getFormattedDuration()}")
+                        if (state.isTracking) {
+                            binding.textTrackingTime.text = state.getFormattedDuration()
+                        }
+                    }
                 }
             }
         }
-
-
-
-        // Enregistrer le récepteur uniquement pour les événements non disponibles via le SharedTrackingManager
-        registerTrackingReceiver()
     }
 
     private fun updateUI(state: TrackingState) {
         // Mise à jour de l'interface utilisateur
         binding.apply {
-            textTrackingTime.text = state.getFormattedDuration()
+            // Remarque: Le temps est mis à jour séparément par la collecte de timerUpdates
 
             if (state.isTracking) {
                 buttonTrack.text = if (state.isPaused)
@@ -118,9 +212,6 @@ class TrackerFragment : Fragment() {
                     getString(R.string.tracking_paused)
                 else
                     getString(R.string.tracking_running)
-
-                // Mettre à jour le flag de tracking
-                tracking = true
             } else {
                 buttonTrack.text = getString(R.string.start_track)
                 buttonTrack.setOnClickListener { startTracking() }
@@ -128,56 +219,19 @@ class TrackerFragment : Fragment() {
                 statusIndicator.setImageResource(R.drawable.outlined_stop_24)
                 statusText.text = getString(R.string.tracking_stopped)
 
-                // Mettre à jour le flag de tracking
-                tracking = false
+                // Réinitialiser le chronomètre si le tracking est arrêté
+                textTrackingTime.text = getString(R.string.defaultTimer)
             }
-        }
-    }
-
-    private fun registerTrackingReceiver() {
-        // Créer et enregistrer le récepteur pour les mises à jour spécifiques
-        trackingUpdateReceiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                // Gérer uniquement les événements qui ne sont pas déjà traités par SharedTrackingManager
-                if (intent.action == LocationService.ACTION_TRACKING_TIME_UPDATE) {
-                    // Cette partie peut être supprimée si le SharedTrackingManager gère déjà correctement les mises à jour de temps
-                    val duration = intent.getLongExtra(LocationService.EXTRA_TRACKING_DURATION, 0L)
-                    binding.textTrackingTime.text = formatDuration(duration)
-                }
-            }
-        }
-
-        // Enregistrer le récepteur
-        ContextCompat.registerReceiver(
-            requireContext(),
-            trackingUpdateReceiver,
-            IntentFilter(LocationService.ACTION_TRACKING_TIME_UPDATE),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-    }
-
-    private fun unregisterReceiver() {
-        trackingUpdateReceiver?.let {
-            requireContext().unregisterReceiver(it)
         }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        unregisterReceiver()
         _binding = null
-    }
-
-    private fun formatDuration(millis: Long): String {
-        val hours = TimeUnit.MILLISECONDS.toHours(millis)
-        val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
-        val seconds = TimeUnit.MILLISECONDS.toSeconds(millis) % 60
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     private fun startTracking() {
         // Récupérer l'ID du voyage depuis les arguments
-        val travelId = arguments?.getLong("travelId") ?: -1L
         if (travelId == -1L) {
             Toast.makeText(
                 requireContext(),
@@ -187,16 +241,73 @@ class TrackerFragment : Fragment() {
             return
         }
 
-        if (!checkPermissions()) return
+        // Vérifier les permissions
+        checkLocationPermissions()
+    }
 
+    private fun checkLocationPermissions() {
+        // Vérifier les permissions de localisation
+        val hasFineLocation = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val hasCoarseLocation = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasFineLocation || hasCoarseLocation) {
+            // Permissions de localisation accordées, vérifier la permission de notification
+            checkNotificationPermission()
+        } else {
+            // Demander les permissions de localisation
+            locationPermissionRequest.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    private fun checkNotificationPermission() {
+        // La permission de notification est seulement nécessaire à partir d'Android 13 (API 33)
+        val hasNotificationPermission = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasNotificationPermission) {
+            // Toutes les permissions nécessaires sont accordées
+            proceedWithTracking()
+        } else {
+            // Demander la permission de notification
+            notificationPermissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun proceedWithTracking() {
+        Log.d("TrackerFragment", "Démarrage du tracking pour le voyage $travelId")
+
+        // D'abord démarrer le service
         Intent(requireContext(), LocationService::class.java).also { intent ->
             intent.action = LocationService.Action.START.name
             intent.putExtra(LocationService.EXTRA_TRAVEL_ID, travelId)
             requireContext().startForegroundService(intent)
         }
+
+        // Ensuite utiliser le ViewModel pour démarrer le tracking via la logique métier
+        trackingViewModel.startTracking(travelId)
     }
 
     private fun pauseTracking() {
+        Log.d("TrackerFragment", "Mise en pause du tracking")
+
+        // Utiliser le ViewModel pour mettre en pause le tracking
+        trackingViewModel.pauseTracking()
+
+        // Puis envoyer la commande au service
         Intent(requireContext(), LocationService::class.java).also { intent ->
             intent.action = LocationService.Action.PAUSE.name
             requireContext().startService(intent)
@@ -204,6 +315,12 @@ class TrackerFragment : Fragment() {
     }
 
     private fun resumeTracking() {
+        Log.d("TrackerFragment", "Reprise du tracking")
+
+        // Utiliser le ViewModel pour reprendre le tracking
+        trackingViewModel.resumeTracking()
+
+        // Puis envoyer la commande au service
         Intent(requireContext(), LocationService::class.java).also { intent ->
             intent.action = LocationService.Action.RESUME.name
             requireContext().startService(intent)
@@ -211,82 +328,23 @@ class TrackerFragment : Fragment() {
     }
 
     private fun stopTracking() {
+        Log.d("TrackerFragment", "Arrêt du tracking")
+
+        // D'abord envoyer la commande d'arrêt au service
         Intent(requireContext(), LocationService::class.java).also { intent ->
             intent.action = LocationService.Action.STOP.name
             requireContext().startService(intent)
         }
-    }
 
-    private fun checkPermissions(): Boolean {
-        // Vérifier les permissions de localisation et de notification
-        val hasLocationPermission = (
-                ActivityCompat.checkSelfPermission(
-                    requireContext(), Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED ||
-                        ActivityCompat.checkSelfPermission(
-                            requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-                )
-
-        val hasNotificationPermission =
-            ActivityCompat.checkSelfPermission(
-                requireContext(), Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-
-        // Demander les permissions manquantes
-        val permissionsToRequest = mutableListOf<String>()
-
-        if (!hasLocationPermission) {
-            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
-            permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
-        }
-
-        if (!hasNotificationPermission) {
-            permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-
-        if (permissionsToRequest.isNotEmpty()) {
-            requestPermissions(
-                permissionsToRequest.toTypedArray(),
-                PERMISSIONS_REQUEST_CODE
-            )
-            return false
-        }
-
-        return true
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (requestCode == PERMISSIONS_REQUEST_CODE) {
-            // Vérifier si toutes les permissions ont été accordées
-            val allGranted = grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-
-            if (allGranted) {
-                startTracking()
-            } else {
-                // Si certaines permissions ont été refusées, afficher un message
-                if (shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                    // L'utilisateur a refusé mais n'a pas coché "Ne plus demander"
-                    showPermissionExplanationDialog()
-                } else {
-                    // L'utilisateur a coché "Ne plus demander"
-                    showPermissionSettingsDialog()
-                }
-            }
-        }
+        // Puis utiliser le ViewModel pour mettre à jour l'état
+        trackingViewModel.stopTracking()
     }
 
     private fun showPermissionExplanationDialog() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Permissions nécessaires")
             .setMessage("Cette fonctionnalité nécessite les permissions de localisation et de notification pour fonctionner correctement.")
-            .setPositiveButton("Réessayer") { _, _ -> checkPermissions() }
+            .setPositiveButton("Réessayer") { _, _ -> checkLocationPermissions() }
             .setNegativeButton("Annuler") { dialog, _ -> dialog.dismiss() }
             .show()
     }
@@ -304,29 +362,5 @@ class TrackerFragment : Fragment() {
             }
             .setNegativeButton("Annuler") { dialog, _ -> dialog.dismiss() }
             .show()
-    }
-
-    companion object {
-        private const val PERMISSIONS_REQUEST_CODE = 100
-    }
-
-    override fun onStart() {
-        super.onStart()
-        Log.d("Fragment", "onStart")
-    }
-
-    override fun onResume() {
-        super.onResume()
-        Log.d("Fragment", "onResume")
-    }
-
-    override fun onPause() {
-        super.onPause()
-        Log.d("Fragment", "onPause")
-    }
-
-    override fun onStop() {
-        super.onStop()
-        Log.d("Fragment", "onStop")
     }
 }

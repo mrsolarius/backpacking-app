@@ -11,8 +11,6 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import fr.louisvolat.api.ApiClient
 import fr.louisvolat.data.repository.CoordinateRepository
-import fr.louisvolat.data.viewmodel.CoordinateViewModel
-import fr.louisvolat.data.viewmodel.CoordinateViewModelFactory
 import fr.louisvolat.database.BackpakingLocalDataBase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,43 +36,52 @@ class UploadLocationsWorker(appContext: Context, workerParams: WorkerParameters)
         }
         val lastUpdate = runBlocking { lastUpdateFlow.first() }
 
-        // Récupérer l'ID du voyage depuis les données d'entrée ou utiliser une valeur par défaut
-        val travelId = inputData.getLong("travel_id", 1)
+        // Récupérer l'ID du voyage depuis les données d'entrée
+        val travelId = inputData.getLong(KEY_TRAVEL_ID, -1)
 
-        // Initialiser le repository et le ViewModel
+        // Vérifier que le travelId est valide
+        if (travelId == -1L) {
+            Log.e("UploadLocationsWorker", "Invalid travel_id: $travelId")
+            return Result.failure()
+        }
+
+        Log.i("UploadLocationsWorker", "Processing coordinates for travel_id: $travelId")
+
+        // Initialiser les repositories
         val database = BackpakingLocalDataBase.getDatabase(applicationContext)
         val coordinateDao = database.coordinateDao()
         val apiClient = ApiClient.getInstance(applicationContext)
+
+        // Utiliser le repository de coordonnées pour l'upload
         val coordinateRepository = CoordinateRepository(coordinateDao, apiClient)
-        val coordinateViewModel = CoordinateViewModelFactory(coordinateRepository).create(CoordinateViewModel::class.java)
 
         // Variables pour stocker le résultat
         var uploadSuccess = false
         var errorMessage: String? = null
 
-        // Exécuter l'upload avec la méthode dédiée au Worker
+        // Exécuter l'upload avec le repository
         runBlocking {
             try {
-                val result = coordinateViewModel.uploadCoordinatesForWorker(travelId, lastUpdate)
+                val result = coordinateRepository.uploadCoordinates(travelId, lastUpdate)
                 result.fold(
                     onSuccess = { response ->
-                        Log.i("UploadLocationsWorker", "Upload successful: ${response.savedCoordinate} coordinates saved")
+                        Log.i("UploadLocationsWorker", "Upload successful: ${response.savedCoordinate} coordinates saved for travel_id: $travelId")
                         uploadSuccess = true
                     },
                     onFailure = { exception ->
                         errorMessage = exception.message
-                        Log.e("UploadLocationsWorker", "Upload failed: $errorMessage")
+                        Log.e("UploadLocationsWorker", "Upload failed for travel_id: $travelId. Error: $errorMessage")
                     }
                 )
             } catch (e: Exception) {
                 errorMessage = e.message
-                Log.e("UploadLocationsWorker", "Error during upload", e)
+                Log.e("UploadLocationsWorker", "Error during upload for travel_id: $travelId", e)
             }
         }
 
         // Traiter le résultat
         return if (uploadSuccess) {
-            Log.i("UploadLocationsWorker", "Worker finished successfully")
+            Log.i("UploadLocationsWorker", "Worker finished successfully for travel_id: $travelId")
             // Mettre à jour la date de dernière mise à jour
             CoroutineScope(Dispatchers.IO).launch {
                 applicationContext.dataStore.edit { preferences ->
@@ -83,9 +90,13 @@ class UploadLocationsWorker(appContext: Context, workerParams: WorkerParameters)
             }
             Result.success()
         } else {
-            Log.e("UploadLocationsWorker", "Worker failed: $errorMessage")
+            Log.e("UploadLocationsWorker", "Worker failed for travel_id: $travelId: $errorMessage")
             Result.retry()
         }
     }
 
+    companion object {
+        // Clé pour les données d'entrée
+        const val KEY_TRAVEL_ID = "travel_id"
+    }
 }

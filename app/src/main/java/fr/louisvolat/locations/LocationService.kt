@@ -11,27 +11,24 @@ import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.lifecycleScope
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
+import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import fr.louisvolat.R
-import fr.louisvolat.api.ApiClient
-import fr.louisvolat.data.repository.CoordinateRepository
-import fr.louisvolat.data.viewmodel.CoordinateViewModel
-import fr.louisvolat.data.viewmodel.CoordinateViewModelFactory
+import fr.louisvolat.data.repository.TrackingRepository
+import fr.louisvolat.data.repository.TrackingRepositoryProvider
 import fr.louisvolat.database.BackpakingLocalDataBase
 import fr.louisvolat.view.MainActivity
 import fr.louisvolat.worker.UploadLocationsWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -39,15 +36,12 @@ class LocationService : LifecycleService(), LocationSaver {
 
     private lateinit var locationRequester: LocationRequester
     private lateinit var database: BackpakingLocalDataBase
-    private lateinit var coordinateViewModel: CoordinateViewModel
+    private lateinit var trackingRepository: TrackingRepository
     private var serviceScope = CoroutineScope(Dispatchers.Default)
-    private var timerJob: Job? = null
     private var travelId: Long = -1
-    private var startTime: Long = 0
-    private var pausedTime: Long = 0
-    private var totalPausedTime: Long = 0
-    private var isTracking = false
-    private var isPaused = false
+    private var isServiceStopping = false
+    private var lastState = TrackingState()
+    private var notificationRemoved = false
 
     private val binder = LocalBinder()
     private val notificationManager by lazy {
@@ -86,148 +80,173 @@ class LocationService : LifecycleService(), LocationSaver {
             Action.STOP.name -> {
                 stop()
             }
+            // Si la notification est supprimée
+            Action.NOTIFICATION_REMOVED.name -> {
+                notificationRemoved = true
+                Log.i("LocationService", "Notification supprimée")
+
+                // Si on est en pause et que la notification est supprimée, on arrête le tracking
+                if (lastState.isPaused) {
+                    Log.i("LocationService", "En pause - arrêt du tracking")
+                    stop()
+                } else if (lastState.isTracking) {
+                    // Si le tracking est actif, on recréé immédiatement la notification
+                    Log.i("LocationService", "Tracking actif - recréation de la notification")
+                    recreateNotification()
+                }
+            }
         }
 
-        lifecycleScope.launch {
-            SharedTrackingManager.trackingState.collect { state ->
-                updateNotification(state)
+        // Modification : Utiliser timerUpdates au lieu de trackingState
+        // pour garantir la mise à jour régulière de la notification
+        serviceScope.launch {
+            trackingRepository.timerUpdates.collectLatest { state ->
+                lastState = state // Sauvegarder le dernier état
+                if (!isServiceStopping) {
+                    // Si la notification a été supprimée et que le tracking est actif, la recréer
+                    if (notificationRemoved && state.isTracking && !state.isPaused) {
+                        recreateNotification()
+                    } else if (!notificationRemoved) {
+                        updateNotification(state)
+                    }
+                }
             }
         }
 
         return START_STICKY
     }
 
+    private fun recreateNotification() {
+        if (!isServiceStopping && lastState.isTracking) {
+            notificationRemoved = false
+            val notification = createNotification(lastState)
+            startForeground(NOTIFICATION_ID, notification)
+            Log.d("LocationService", "Notification recréée")
+        }
+    }
+
     @RequiresPermission(anyOf = ["android.permission.ACCESS_COARSE_LOCATION", "android.permission.ACCESS_FINE_LOCATION"])
     private fun start() {
-        if (isTracking) return
+        Log.i("LocationService", "Service start called")
+        isServiceStopping = false
+        notificationRemoved = false
 
-        startTime = System.currentTimeMillis()
-        isTracking = true
-        isPaused = false
-        totalPausedTime = 0
-
-        // Notifier le SharedTrackingManager
-        SharedTrackingManager.processAction(TrackingAction.Start(travelId))
-
-        val state = TrackingState(
-            isTracking = true,
-            isPaused = false,
-            currentTravelId = travelId,
-            startTimeMillis = startTime
-        )
-
-        val notification = createNotification(state)
+        // IMPORTANT: Démarrer d'abord le foreground service avec une notification initiale
+        // pour éviter le ForegroundServiceDidNotStartInTimeException
+        val initialState = TrackingState(isTracking = true, isPaused = false)
+        val notification = createNotification(initialState)
         startForeground(NOTIFICATION_ID, notification)
 
-        locationRequester = LocationRequester(this, 15000, 10f, this)
-        locationRequester.startLocationTracking()
-        scheduleUploadLocationsWorker()
+        // Ensuite lancer l'action de démarrage du tracking dans le repository
+        serviceScope.launch {
+            trackingRepository.processAction(TrackingAction.Start(travelId))
 
-        // Démarrer le timer pour la mise à jour de la notification
-        startTimer()
+            // Initialiser et démarrer la collecte de localisation
+            locationRequester = LocationRequester(this@LocationService, 15000, 10f, this@LocationService)
+            locationRequester.startLocationTracking()
+            scheduleUploadLocationsWorker(travelId)
 
-        broadcastTrackingStatus(true, false, travelId)
-        Log.i("LocationService", "Service successfully started")
+            broadcastTrackingStatus(true, false, travelId)
+            Log.i("LocationService", "Tracking successfully started")
+        }
     }
 
     private fun pause() {
-        if (!isTracking || isPaused) return
+        Log.i("LocationService", "Pause called")
 
-        isPaused = true
-        pausedTime = System.currentTimeMillis()
+        // Vérifier que le LocationRequester est initialisé avant de l'utiliser
+        if (!::locationRequester.isInitialized) {
+            Log.e("LocationService", "Cannot pause tracking, locationRequester not initialized")
+            return
+        }
 
-        // Arrêter la collecte de localisation
-        locationRequester.stopLocationTracking()
+        // Réinitialiser le flag de notification supprimée
+        notificationRemoved = false
 
-        // Notifier le SharedTrackingManager
-        SharedTrackingManager.processAction(TrackingAction.Pause)
+        serviceScope.launch {
+            trackingRepository.processAction(TrackingAction.Pause)
+            locationRequester.stopLocationTracking()
 
-        broadcastTrackingStatus(true, true, travelId)
-        Log.i("LocationService", "Tracking paused")
+            broadcastTrackingStatus(true, true, travelId)
+            Log.i("LocationService", "Tracking paused")
+        }
     }
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun resume() {
-        if (!isTracking || !isPaused) return
+        Log.i("LocationService", "Resume called")
 
-        // Calculer le temps pausé et l'ajouter au total
-        val pauseDuration = System.currentTimeMillis() - pausedTime
-        totalPausedTime += pauseDuration
+        // Réinitialiser le flag de notification supprimée
+        notificationRemoved = false
 
-        isPaused = false
+        // Vérifier que le LocationRequester est initialisé avant de l'utiliser
+        if (!::locationRequester.isInitialized) {
+            Log.e("LocationService", "Cannot resume tracking, locationRequester not initialized")
 
-        // Redémarrer la collecte de localisation
-        locationRequester.startLocationTracking()
+            // Réinitialiser le locationRequester si nécessaire
+            locationRequester = LocationRequester(this, 15000, 10f, this)
+        }
 
-        // Notifier le SharedTrackingManager
-        SharedTrackingManager.processAction(TrackingAction.Resume)
-
-        broadcastTrackingStatus(true, false, travelId)
-        Log.i("LocationService", "Tracking resumed")
+        serviceScope.launch {
+            // IMPORTANT: Nous voulons continuer le tracking en cours, pas en démarrer un nouveau
+            trackingRepository.processAction(TrackingAction.Resume)
+            locationRequester.startLocationTracking()
+            broadcastTrackingStatus(true, false, travelId)
+            Log.i("LocationService", "Tracking resumed")
+        }
     }
 
     private fun stop() {
-        if (!isTracking) return
+        Log.i("LocationService", "Stop called")
 
-        isTracking = false
-        isPaused = false
+        // Marquer le service comme étant en cours d'arrêt pour éviter les mises à jour de notification
+        isServiceStopping = true
 
-        locationRequester.stopLocationTracking()
-        WorkManager.getInstance(this).cancelUniqueWork("UploadLocationsWorkerPeriodic")
-        executeUploadLocationsWorkerOneTime()
+        // Supprimer immédiatement la notification avant tout
+        notificationManager.cancel(NOTIFICATION_ID)
 
-        // Annuler le timer
-        timerJob?.cancel()
+        serviceScope.launch {
+            try {
+                // Récupérer le travelId actuel depuis le repository pour s'assurer qu'il est à jour
+                val currentTravelId = lastState.currentTravelId ?: travelId
 
-        // Notifier le SharedTrackingManager
-        SharedTrackingManager.processAction(TrackingAction.Stop)
+                // Arrêter le tracking dans le repository
+                trackingRepository.processAction(TrackingAction.Stop)
 
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
-
-        broadcastTrackingStatus(false, false, travelId)
-        Log.i("LocationService", "Service successfully stopped")
-    }
-
-    private fun startTimer() {
-        timerJob?.cancel()
-        timerJob = serviceScope.launch {
-            while (isTracking) {
-                if (!isPaused) {
-                    val currentTime = System.currentTimeMillis()
-                    val trackingDuration = currentTime - startTime - totalPausedTime
-
-                    // Mettre à jour l'état dans le SharedTrackingManager toutes les secondes
-                    val state = TrackingState(
-                        isTracking = isTracking,
-                        isPaused = isPaused,
-                        currentTravelId = travelId,
-                        startTimeMillis = startTime,
-                        totalPausedDurationMillis = totalPausedTime
-                    )
-
-                    SharedTrackingManager.processAction(
-                        TrackingAction.UpdateState(state)
-                    )
-                    updateNotification(state)
-
-                    // Broadcast pour mise à jour supplémentaire au fragment si nécessaire
-                    val intent = Intent(ACTION_TRACKING_TIME_UPDATE).apply {
-                        putExtra(EXTRA_TRACKING_DURATION, trackingDuration)
-                    }
-
-                    sendBroadcast(intent)
+                // Vérifier que le LocationRequester est initialisé avant de l'utiliser
+                if (::locationRequester.isInitialized) {
+                    locationRequester.stopLocationTracking()
                 }
-                delay(1000) // Mise à jour chaque seconde
+
+                // Gérer les workers
+                WorkManager.getInstance(this@LocationService).cancelUniqueWork("UploadLocationsWorkerPeriodic")
+                executeUploadLocationsWorkerOneTime(currentTravelId)
+
+                // Arrêter explicitement le service en premier plan
+                stopForeground(STOP_FOREGROUND_REMOVE)
+
+                // Envoyer le broadcast
+                broadcastTrackingStatus(false, false, currentTravelId)
+
+                Log.i("LocationService", "Service successfully stopped")
+            } catch (e: Exception) {
+                Log.e("LocationService", "Error stopping service: ${e.message}")
+            } finally {
+                // S'assurer que le service est bien arrêté
+                stopSelf()
             }
         }
     }
 
     private fun updateNotification(state: TrackingState) {
-        if (!isTracking) return
+        if (!state.isTracking || isServiceStopping || notificationRemoved) return
 
-        val notification = createNotification(state)
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        try {
+            val notification = createNotification(state)
+            notificationManager.notify(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            Log.e("LocationService", "Error updating notification: ${e.message}")
+        }
     }
 
     private fun createNotification(state: TrackingState): android.app.Notification {
@@ -261,6 +280,15 @@ class LocationService : LifecycleService(), LocationSaver {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Intent pour notification supprimée
+        val notificationRemovedIntent = Intent(this, LocationService::class.java).apply {
+            action = Action.NOTIFICATION_REMOVED.name
+        }
+        val pendingNotificationRemovedIntent = PendingIntent.getService(
+            this, 3, notificationRemovedIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         // Texte de la notification adapté à l'état actuel
         val statusText = if (state.isPaused) {
             getString(R.string.tracking_paused)
@@ -281,6 +309,7 @@ class LocationService : LifecycleService(), LocationSaver {
             R.drawable.outlined_pause_24
         }
 
+        // Créer une notification qui utilisera pendingRecreateIntent quand supprimée
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.location_service_channel))
             .setContentText("$statusText - ${state.getFormattedDuration()}")
@@ -289,6 +318,7 @@ class LocationService : LifecycleService(), LocationSaver {
             .setColor(ContextCompat.getColor(applicationContext, R.color.md_theme_surfaceContainerLow))
             .setColorized(true)
             .setContentIntent(pendingContentIntent)
+            .setDeleteIntent(pendingNotificationRemovedIntent) // Appelé quand notification supprimée
             .addAction(
                 pauseResumeIcon,
                 pauseResumeActionText,
@@ -304,14 +334,18 @@ class LocationService : LifecycleService(), LocationSaver {
             .build()
     }
 
-    private fun scheduleUploadLocationsWorker() {
-        Log.i("LocationService", "Scheduling UploadLocationsWorker")
+    private fun scheduleUploadLocationsWorker(travelId: Long) {
+        Log.i("LocationService", "Scheduling UploadLocationsWorker for travelId: $travelId")
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
+        // Créer les données d'entrée avec le travelId
+        val inputData = createWorkerInputData(travelId)
+
         val uploadWorkerRequest = PeriodicWorkRequestBuilder<UploadLocationsWorker>(90, TimeUnit.MINUTES)
             .setConstraints(constraints)
+            .setInputData(inputData)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
             .build()
 
@@ -322,53 +356,72 @@ class LocationService : LifecycleService(), LocationSaver {
         )
     }
 
-    private fun executeUploadLocationsWorkerOneTime() {
+    private fun executeUploadLocationsWorkerOneTime(travelId: Long) {
+        Log.i("LocationService", "Executing one-time UploadLocationsWorker for travelId: $travelId")
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
 
+        // Créer les données d'entrée avec le travelId
+        val inputData = createWorkerInputData(travelId)
+
         val uploadWorkerRequest = OneTimeWorkRequest.Builder(UploadLocationsWorker::class.java)
             .setConstraints(constraints)
+            .setInputData(inputData)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
             .build()
 
         WorkManager.getInstance(this).enqueue(uploadWorkerRequest)
     }
 
+    private fun createWorkerInputData(travelId: Long): Data {
+        return Data.Builder()
+            .putLong("travel_id", travelId)
+            .build()
+    }
+
     override fun onCreate() {
         super.onCreate()
         database = BackpakingLocalDataBase.getDatabase(this)
 
-        // Initialisation du repository et du ViewModel
-        val coordinateDao = database.coordinateDao()
-        val apiClient = ApiClient.getInstance(this)
-        val coordinateRepository = CoordinateRepository(coordinateDao, apiClient)
-        coordinateViewModel = CoordinateViewModelFactory(coordinateRepository).create(CoordinateViewModel::class.java)
-
+        // Initialisation du repository
+        trackingRepository = TrackingRepositoryProvider.getInstance(applicationContext)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        timerJob?.cancel()
-        serviceScope.cancel()
-        if (isTracking) {
-            stop()
+
+        // Supprimer à nouveau la notification pour s'assurer qu'elle disparaît
+        isServiceStopping = true
+        notificationManager.cancel(NOTIFICATION_ID)
+
+        try {
+            serviceScope.cancel()
+
+            if (::locationRequester.isInitialized) {
+                locationRequester.stopLocationTracking()
+            }
+
+            // Essayer de forcer l'arrêt du service en premier plan
+            stopForeground(STOP_FOREGROUND_REMOVE)
+
+        } catch (e: Exception) {
+            Log.e("LocationService", "Error in onDestroy: ${e.message}")
         }
     }
 
     override fun saveLocation(latitude: Double, longitude: Double, altitude: Double, time: Long) {
-        if (travelId != -1L) {
-            coordinateViewModel.saveCoordinate(latitude, longitude, altitude, time, travelId)
-
-            // Notifier le SharedTrackingManager de la nouvelle localisation
-            SharedTrackingManager.processAction(
-                TrackingAction.UpdateLocation(
-                    latitude = latitude,
-                    longitude = longitude,
-                    altitude = altitude,
-                    time = time
+        if (travelId != -1L && !isServiceStopping) {
+            serviceScope.launch {
+                trackingRepository.processAction(
+                    TrackingAction.UpdateLocation(
+                        latitude = latitude,
+                        longitude = longitude,
+                        altitude = altitude,
+                        time = time
+                    )
                 )
-            )
+            }
         }
     }
 
@@ -388,18 +441,17 @@ class LocationService : LifecycleService(), LocationSaver {
 
         // Actions pour les broadcasts
         const val ACTION_TRACKING_STATUS_CHANGED = "fr.louisvolat.TRACKING_STATUS_CHANGED"
-        const val ACTION_TRACKING_TIME_UPDATE = "fr.louisvolat.TRACKING_TIME_UPDATE"
 
         // Extras pour les broadcasts
         const val EXTRA_IS_TRACKING = "extra_is_tracking"
         const val EXTRA_IS_PAUSED = "extra_is_paused"
-        const val EXTRA_TRACKING_DURATION = "extra_tracking_duration"
     }
 
     enum class Action {
         START,
         STOP,
         PAUSE,
-        RESUME
+        RESUME,
+        NOTIFICATION_REMOVED
     }
 }

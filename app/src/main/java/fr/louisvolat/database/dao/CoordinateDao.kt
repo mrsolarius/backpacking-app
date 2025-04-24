@@ -28,11 +28,14 @@ interface CoordinateDao {
     fun getByTravelIdFromDate(travelId: Long, date: Long): List<Coordinate>
 
     @Query("DELETE FROM Coordinate WHERE date < :date")
-    fun deleteBeforeDate(date: Long)
+    suspend fun deleteBeforeDate(date: Long)
 
     @Query("DELETE FROM Coordinate WHERE travelId = :travelId")
     fun deleteByTravelId(travelId: Long)
 
     @Query("SELECT COUNT(*) FROM Coordinate WHERE travelId = :travelId")
     fun getCountForTravel(travelId: Long): Int
+
+    @Query("SELECT * FROM Coordinate WHERE travelId = :travelId")
+    suspend fun getCoordinatesForTravel(travelId: Long): List<Coordinate>
 }
