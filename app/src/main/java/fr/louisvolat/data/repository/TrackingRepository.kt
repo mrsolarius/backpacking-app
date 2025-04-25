@@ -2,10 +2,12 @@ package fr.louisvolat.data.repository
 
 import fr.louisvolat.database.dao.CoordinateDao
 import fr.louisvolat.database.entity.Coordinate
+import fr.louisvolat.lifecycle.AppStateManager
 import fr.louisvolat.locations.TrackingAction
 import fr.louisvolat.locations.TrackingState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,8 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class TrackingRepository(
-    private val coordinateDao: CoordinateDao
-) {
+    private val coordinateDao: CoordinateDao,
+    private val appStateManager: AppStateManager
+): AppStateManager.AppStateListener  {
     // Changement: Utiliser un MutableSharedFlow pour l'état du tracking
     private val _trackingState = MutableSharedFlow<TrackingState>(
         replay = 1,
@@ -51,11 +54,31 @@ class TrackingRepository(
     // Timer job pour les mises à jour périodiques
     private var timerJob: kotlinx.coroutines.Job? = null
     private val timerScope = CoroutineScope(Dispatchers.Default)
+    private var timerUpdateIntervalMs: Long = 1000
 
     // Initialisation: émettre l'état initial
     init {
+        appStateManager.registerAppStateListener(this)
         CoroutineScope(Dispatchers.Default).launch {
             _trackingState.emit(currentState)
+        }
+    }
+
+    override fun onAppStateChanged(isInForeground: Boolean, isScreenOn: Boolean) {
+        updateTimerFrequency(isInForeground, isScreenOn)
+    }
+
+    private fun updateTimerFrequency(isInForeground: Boolean, isScreenOn: Boolean) {
+        timerUpdateIntervalMs = when {
+            isInForeground -> 1000L // 1 seconde au premier plan
+            !isScreenOn -> 15 * 60 * 1000L // 15 minutes quand écran éteint
+            else -> 60 * 1000L // 1 minute en arrière-plan
+        }
+
+        // Redémarrer le timer avec la nouvelle fréquence si nécessaire
+        if (currentState.isTracking && !currentState.isPaused) {
+            stopTimerUpdates()
+            startTimerUpdates()
         }
     }
 
@@ -177,7 +200,7 @@ class TrackingRepository(
                     // Émettre un TimerTick pour forcer une mise à jour
                     processAction(TrackingAction.TimerTick)
                 }
-                kotlinx.coroutines.delay(1000)
+                delay(timerUpdateIntervalMs)
             }
         }
     }
@@ -223,4 +246,8 @@ class TrackingRepository(
         return coordinateDao.getCoordinatesForTravel(travelId)
     }
 
+    fun cleanup() {
+        appStateManager.unregisterAppStateListener(this)
+        stopTimerUpdates()
+    }
 }

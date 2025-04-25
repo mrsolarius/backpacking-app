@@ -23,6 +23,8 @@ import fr.louisvolat.R
 import fr.louisvolat.data.repository.TrackingRepository
 import fr.louisvolat.data.repository.TrackingRepositoryProvider
 import fr.louisvolat.database.BackpakingLocalDataBase
+import fr.louisvolat.lifecycle.AppStateManager
+import fr.louisvolat.lifecycle.AppStateManagerImpl
 import fr.louisvolat.view.MainActivity
 import fr.louisvolat.worker.UploadLocationsWorker
 import kotlinx.coroutines.CoroutineScope
@@ -42,6 +44,8 @@ class LocationService : LifecycleService(), LocationSaver {
     private var isServiceStopping = false
     private var lastState = TrackingState()
     private var notificationRemoved = false
+
+    private lateinit var appStateManager: AppStateManager
 
     private val binder = LocalBinder()
     private val notificationManager by lazy {
@@ -293,7 +297,7 @@ class LocationService : LifecycleService(), LocationSaver {
         val statusText = if (state.isPaused) {
             getString(R.string.tracking_paused)
         } else {
-            getString(R.string.tracking_running)
+            state.getFormattedActivityText()
         }
 
         // Bouton pause/reprise adapté à l'état actuel
@@ -309,16 +313,16 @@ class LocationService : LifecycleService(), LocationSaver {
             R.drawable.outlined_pause_24
         }
 
-        // Créer une notification qui utilisera pendingRecreateIntent quand supprimée
+        // Création de la notification avec le nouveau texte
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.location_service_channel))
-            .setContentText("$statusText - ${state.getFormattedDuration()}")
+            .setContentText(statusText)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setColor(ContextCompat.getColor(applicationContext, R.color.md_theme_surfaceContainerLow))
             .setColorized(true)
             .setContentIntent(pendingContentIntent)
-            .setDeleteIntent(pendingNotificationRemovedIntent) // Appelé quand notification supprimée
+            .setDeleteIntent(pendingNotificationRemovedIntent)
             .addAction(
                 pauseResumeIcon,
                 pauseResumeActionText,
@@ -329,7 +333,7 @@ class LocationService : LifecycleService(), LocationSaver {
                 getString(R.string.stop_tracking_notif),
                 pendingStopIntent
             )
-            .setOnlyAlertOnce(true)  // Pour éviter que la notification flashe à chaque mise à jour
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .build()
     }
@@ -383,6 +387,8 @@ class LocationService : LifecycleService(), LocationSaver {
     override fun onCreate() {
         super.onCreate()
         database = BackpakingLocalDataBase.getDatabase(this)
+        appStateManager = AppStateManagerImpl(applicationContext)
+        appStateManager.startMonitoring()
 
         // Initialisation du repository
         trackingRepository = TrackingRepositoryProvider.getInstance(applicationContext)

@@ -43,6 +43,43 @@ data class TrackingState(
 
         return String.format("%02d:%02d:%02d", hours, minutes, seconds)
     }
+
+    /**
+     * Retourne un texte d'activité formaté pour la notification
+     */
+    fun getFormattedActivityText(): String {
+        val durationMillis = getTotalDurationMillis()
+
+        return when {
+            durationMillis < 60 * 1000 -> { // Moins d'une minute
+                val seconds = (durationMillis / 1000).toInt()
+                "Actif depuis $seconds seconde${if (seconds > 1) "s" else ""}"
+            }
+            durationMillis < 60 * 60 * 1000 -> { // Moins d'une heure
+                val minutes = (durationMillis / (1000 * 60)).toInt()
+                "Actif depuis $minutes minute${if (minutes > 1) "s" else ""}"
+            }
+            else -> { // Plus d'une heure
+                val hours = (durationMillis / (1000 * 60 * 60)).toInt()
+                var minutes = ((durationMillis % (1000 * 60 * 60)) / (1000 * 60)).toInt()
+
+                // Arrondir au quart d'heure le plus proche
+                minutes = when {
+                    minutes < 8 -> 0
+                    minutes < 23 -> 15
+                    minutes < 38 -> 30
+                    minutes < 53 -> 45
+                    else -> 0 // Si proche de 60, on arrondit à l'heure suivante
+                }
+
+                if (minutes == 0) {
+                    "Actif depuis $hours h"
+                } else {
+                    "Actif depuis $hours h $minutes min"
+                }
+            }
+        }
+    }
 }
 
 /**
