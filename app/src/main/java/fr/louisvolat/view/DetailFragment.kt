@@ -4,14 +4,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AnimationUtils
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
-import androidx.navigation.NavArgument
 import androidx.navigation.NavController
-import androidx.navigation.NavType
-import androidx.navigation.fragment.FragmentNavigator
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.NavigationUI
 import fr.louisvolat.R
@@ -109,46 +104,6 @@ class DetailFragment : Fragment() {
         navController.graph = navGraph
 
         setupNavigation()
-        setupFab()
-    }
-
-
-    private fun setupFab() {
-        binding.fab.setOnClickListener {
-            // Lancer la nouvelle Activity au lieu d'utiliser NavController
-            //launchCreateTravelActivity()
-        }
-
-        navController.addOnDestinationChangedListener { _, destination, _ ->
-            when (destination.id) {
-                R.id.uploadFragment -> { // Remplace par les IDs de tes fragments
-                    showFab()
-                }
-                else -> {
-                    hideFab()
-                }
-            }
-        }
-    }
-
-    private fun showFab() {
-        binding.fab.apply {
-            visibility = View.VISIBLE
-            val animation = AnimationUtils.loadAnimation(context, R.anim.fab_show)
-            startAnimation(animation)
-        }
-    }
-
-    fun hideFab() {
-        val animation = AnimationUtils.loadAnimation(binding.fab.context, R.anim.fab_hide)
-        animation.setAnimationListener(object : android.view.animation.Animation.AnimationListener {
-            override fun onAnimationStart(animation: android.view.animation.Animation?) {}
-            override fun onAnimationEnd(animation: android.view.animation.Animation?) {
-                binding.fab.visibility = View.GONE
-            }
-            override fun onAnimationRepeat(animation: android.view.animation.Animation?) {}
-        })
-        binding.fab.startAnimation(animation)
     }
 
     private fun setupNavigation() {

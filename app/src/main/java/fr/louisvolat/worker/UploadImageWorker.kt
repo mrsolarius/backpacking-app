@@ -3,73 +3,156 @@ package fr.louisvolat.worker
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import androidx.exifinterface.media.ExifInterface
-import androidx.work.Worker
+import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
+import fr.louisvolat.api.ApiClient
+import fr.louisvolat.upload.ImageUploadManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.util.UUID
 
-class UploadImageWorker(appContext: Context, workerParams: WorkerParameters) :
-    Worker(appContext, workerParams) {
+/**
+ * Worker amélioré pour l'upload d'images
+ * Applique le principe de substitution de Liskov (L de SOLID) en étant interchangeable avec d'autres workers
+ */
+class UploadImageWorker(
+    appContext: Context,
+    params: WorkerParameters
+) : CoroutineWorker(appContext, params) {
 
-    override fun doWork(): Result {
-        val uris = inputData.getStringArray("uris") ?: return Result.failure()
+    private val tag = "UploadImageWorker"
+    private val uploadManager = ImageUploadManager.getInstance(appContext)
+    private val apiClient = ApiClient.getInstance(appContext)
 
-        val client = okhttp3.OkHttpClient()
+    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        try {
+            val uploadId = inputData.getString(ImageUploadManager.KEY_UPLOAD_ID) ?: return@withContext Result.failure()
+            val uriStrings = inputData.getStringArray(ImageUploadManager.KEY_URI_LIST) ?: return@withContext Result.failure()
+            val travelId = inputData.getLong(ImageUploadManager.KEY_TRAVEL_ID, -1L)
+            val totalImages = inputData.getInt(ImageUploadManager.KEY_TOTAL_IMAGES, 0)
+            val startIndex = inputData.getInt(ImageUploadManager.KEY_CURRENT_INDEX, 0)
 
-        for (uriString in uris) {
-            val uri = Uri.parse(uriString)
-            val uuid = UUID.randomUUID().toString()
-            val file = File(applicationContext.cacheDir, uuid)
-            uri?.let { applicationContext.contentResolver.openInputStream(it) }.use { input ->
-                file.outputStream().use { output ->
-                    input?.copyTo(output)
+            if (travelId == -1L || uriStrings.isEmpty()) {
+                Log.e(tag, "Invalid travel ID or empty URI list")
+                return@withContext Result.failure()
+            }
+
+            var successCount = 0
+            var currentIndex = startIndex
+
+            // Pour chaque URI, tenter l'upload
+            for (i in startIndex until uriStrings.size) {
+                currentIndex = i
+                val uriString = uriStrings[i]
+                val uri = Uri.parse(uriString)
+
+                // Mettre à jour la notification
+                val currentProgress = (i * 100) / totalImages
+                setProgressAsync(workDataOf(
+                    "progress" to currentProgress,
+                    "current_index" to i,
+                    "total" to totalImages
+                ))
+
+                val result = uploadSingleImage(uri, travelId)
+
+                // Mettre à jour l'état de l'upload
+                uploadManager.updateUploadState(uploadId, i, result, uri)
+
+                if (result) {
+                    successCount++
+                } else {
+                    // Si l'upload échoue, continuer avec les autres images
+                    Log.e(tag, "Failed to upload image: $uri")
+                }
+
+                // Vérifier si le travail a été annulé
+                if (isStopped) {
+                    Log.i(tag, "Upload work was cancelled")
+                    break
                 }
             }
-            val inputStream = file.inputStream()
-            val requestBody = inputStream.readBytes().toRequestBody("image/*".toMediaTypeOrNull())
-            val body = requestBody.let {
-                MultipartBody.Part.createFormData("picture", UUID.randomUUID().toString(), it)
-            }
 
-            val multipartBodyBuilder = MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addPart(body)
-
-            val exifInterface = ExifInterface(file)
-
-            val tagsToCheck = arrayOf(
-                ExifInterface.TAG_DATETIME,
-                ExifInterface.TAG_GPS_LATITUDE,
-                ExifInterface.TAG_GPS_LONGITUDE,
-                ExifInterface.TAG_GPS_ALTITUDE
+            // Créer les données de sortie
+            val outputData = workDataOf(
+                "success_count" to successCount,
+                "total_count" to uriStrings.size,
+                "failed_count" to (uriStrings.size - successCount)
             )
 
-            for (tag in tagsToCheck) {
-                exifInterface.getAttribute(tag)
-                    ?.let { multipartBodyBuilder.addFormDataPart("exif_$tag", it) }
+            // Déterminer le résultat final
+            return@withContext if (successCount == uriStrings.size) {
+                Result.success(outputData)
+            } else if (successCount > 0) {
+                Result.success(outputData) // Considérer comme réussi même si certains ont échoué
+            } else {
+                Result.failure(outputData)
             }
-            val multipartBody = multipartBodyBuilder.build()
 
-            file.delete()
-
-            val request = okhttp3.Request.Builder()
-                .url("https://api.backpaking.louisvolat.fr/api/pictures")
-                .post(multipartBody)
-                .build()
-
-            val response = client.newCall(request).execute()
-
-            if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: "Unknown error"
-                Log.d("error", errorBody)
-                return Result.failure()
-            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error in upload worker", e)
+            return@withContext Result.failure(
+                workDataOf("error" to (e.message ?: "Unknown error"))
+            )
         }
+    }
 
-        return Result.success()
+    /**
+     * Upload une seule image
+     */
+    private suspend fun uploadSingleImage(uri: Uri, travelId: Long): Boolean {
+        var tempFile: File? = null
+
+        try {
+            // Créer un fichier temporaire
+            tempFile = createTempFileFromUri(uri)
+            if (tempFile == null) {
+                Log.e(tag, "Failed to create temp file from URI: $uri")
+                return false
+            }
+
+            // Préparer la requête multipart
+            val requestBody = tempFile.asRequestBody("image/*".toMediaTypeOrNull())
+            val filePart = MultipartBody.Part.createFormData(
+                "picture",
+                UUID.randomUUID().toString(),
+                requestBody
+            )
+
+            // Exécuter l'upload
+            val response = apiClient.pictureService.uploadPicture(travelId, filePart).execute()
+
+            return response.isSuccessful
+
+        } catch (e: Exception) {
+            Log.e(tag, "Error uploading image", e)
+            return false
+        } finally {
+            // Nettoyer le fichier temporaire
+            tempFile?.delete()
+        }
+    }
+
+    /**
+     * Crée un fichier temporaire à partir d'un URI
+     */
+    private suspend fun createTempFileFromUri(uri: Uri): File? = withContext(Dispatchers.IO) {
+        try {
+            val tempFile = File(applicationContext.cacheDir, "temp_upload_${System.currentTimeMillis()}.jpg")
+            applicationContext.contentResolver.openInputStream(uri)?.use { input ->
+                tempFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            tempFile
+        } catch (e: Exception) {
+            Log.e(tag, "Error creating temp file", e)
+            null
+        }
     }
 }

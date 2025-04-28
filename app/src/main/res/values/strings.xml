@@ -81,4 +81,21 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="defaultTimer">00:00:00</string>
 
+    <string name="upload_images_title">Télécharger des images</string>
+    <string name="upload_ready">Prêt à télécharger des images</string>
+    <string name="select_images">Sélectionner des images</string>
+    <string name="cancel_upload">Annuler le téléchargement</string>
+    <string name="retry_failed_uploads">Réessayer les téléchargements échoués</string>
+    <string name="upload_info_message">Les images téléchargées seront associées au voyage actuel. Assurez-vous que les photos contiennent des coordonnées GPS.</string>
+    <string name="upload_notification_channel_name">Téléchargements d\'images</string>
+    <string name="upload_notification_channel_description">Affiche l\'état des téléchargements d\'images</string>
+    <string name="uploading_images">Téléchargement d\'images</string>
+    <string name="upload_completed">Téléchargement terminé</string>
+    <string name="upload_success_message">%1$d images téléchargées avec succès</string>
+    <string name="upload_failed">Échec du téléchargement</string>
+    <string name="upload_failed_message">%1$d/%2$d images n\'ont pas pu être téléchargées</string>
+    <string name="retry">Réessayer</string>
+    <string name="upload_waiting_network">En attente de connexion réseau</string>
+    <string name="upload_waiting_battery">En attente - batterie faible</string>
+
 </resources>
