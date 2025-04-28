@@ -319,7 +319,7 @@ class LocationService : LifecycleService(), LocationSaver {
             .setContentText(statusText)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setColor(ContextCompat.getColor(applicationContext, R.color.md_theme_surfaceContainerLow))
+            .setColor(ContextCompat.getColor(applicationContext, R.color.md_theme_primaryContainer_highContrast))
             .setColorized(true)
             .setContentIntent(pendingContentIntent)
             .setDeleteIntent(pendingNotificationRemovedIntent)

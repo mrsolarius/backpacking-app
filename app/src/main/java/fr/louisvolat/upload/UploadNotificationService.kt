@@ -10,13 +10,15 @@ import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import fr.louisvolat.R
+import fr.louisvolat.upload.notification.UploadBroadcastReceiver
+import fr.louisvolat.upload.state.UploadState
 import fr.louisvolat.view.MainActivity
 
 /**
- * Gestionnaire de notifications pour les uploads d'images
- * Applique le principe d'ouverture/fermeture (O de SOLID) en permettant d'étendre facilement les types de notifications
+ * Service de notification pour les uploads d'images
+ * Respecte le principe de responsabilité unique (S de SOLID)
  */
-class UploadNotificationManager(private val context: Context) {
+class UploadNotificationService(private val context: Context) {
 
     companion object {
         const val CHANNEL_ID = "image_upload_channel"
@@ -43,14 +45,27 @@ class UploadNotificationManager(private val context: Context) {
     }
 
     /**
+     * Met à jour la notification en fonction de l'état d'upload actuel
+     */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    fun updateNotification(state: UploadState) {
+        when {
+            state.isUploading -> showUploadProgressNotification(state)
+            state.isComplete && !state.hasErrors -> showUploadCompletedNotification(state.uploadedImages)
+            state.hasErrors -> showUploadFailedNotification(state.failedUris.size, state.totalImages)
+            else -> cancelNotification()
+        }
+    }
+
+    /**
      * Affiche une notification d'upload en cours avec une barre de progression
      */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    fun showUploadProgressNotification(uploadState: UploadState) {
+    private fun showUploadProgressNotification(state: UploadState) {
         val builder = createBaseNotificationBuilder()
             .setContentTitle(context.getString(R.string.uploading_images))
-            .setContentText("${uploadState.progressText} (${uploadState.progress}%)")
-            .setProgress(100, uploadState.progress, false)
+            .setContentText("${state.progressText} (${state.progress}%)")
+            .setProgress(100, state.progress, false)
             .setOngoing(true)
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
@@ -60,11 +75,13 @@ class UploadNotificationManager(private val context: Context) {
      * Affiche une notification d'upload terminé
      */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    fun showUploadCompletedNotification(totalUploaded: Int) {
+    private fun showUploadCompletedNotification(totalUploaded: Int) {
         val builder = createBaseNotificationBuilder()
             .setContentTitle(context.getString(R.string.upload_completed))
             .setContentText(context.getString(R.string.upload_success_message, totalUploaded))
             .setProgress(0, 0, false)
+            .clearActions()
+            .setSmallIcon(R.drawable.outlined_check_circle_24)
             .setAutoCancel(true)
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build())
@@ -74,7 +91,7 @@ class UploadNotificationManager(private val context: Context) {
      * Affiche une notification d'échec d'upload avec option de réessayer
      */
     @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
-    fun showUploadFailedNotification(failedCount: Int, totalCount: Int) {
+    private fun showUploadFailedNotification(failedCount: Int, totalCount: Int) {
         // Intent pour réessayer
         val retryIntent = Intent(context, UploadBroadcastReceiver::class.java).apply {
             action = ACTION_RETRY

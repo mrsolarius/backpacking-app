@@ -13,6 +13,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import fr.louisvolat.upload.state.UploadState
 import fr.louisvolat.worker.UploadImageWorker
 import java.util.concurrent.TimeUnit
 

@@ -97,5 +97,21 @@
     <string name="retry">Réessayer</string>
     <string name="upload_waiting_network">En attente de connexion réseau</string>
     <string name="upload_waiting_battery">En attente - batterie faible</string>
-
+    <string name="permission_needed_title">Permission nécessaire</string>
+    <string name="notification_permission_explanation">Cette fonctionnalité nécessite la permission de notification pour vous tenir informé de l\'avancement des téléchargements.</string>
+    <string name="permission_denied_title">Permission refusée</string>
+    <string name="notification_permission_settings_explanation">La permission de notification a été refusée définitivement. Veuillez l\'activer dans les paramètres de l\'application pour utiliser pleinement cette fonctionnalité.</string>
+    <string name="error_starting_upload_no_travel">Aucun voyage sélectioner lors du démarage de l\'upload</string>
+    <string name="uploading_in_progress">Téléchargement en cours...</string>
+    <string name="upload_failed_count">Échec du téléchargement de %d image(s)</string>
+    <string name="upload_cancelled_user">Upload annulé par l\'utilisateur</string>
+    <string name="upload_failed_generic">Une erreur inconue c\'est produites lors de l\'upload</string>
+    <string name="ready_to_upload">Prêt à télécharger</string>
+    <string name="select_travel_for_retry">Selectioner un voyage pour upload\n</string>
+    <string name="select_travel_first">Commencer par sélectioner un voyage</string>
+    <string name="ok">Ok</string>
+    <plurals name="upload_failed_count_plural">
+        <item quantity="one">Échec du téléchargement d\'une image</item>
+        <item quantity="other">Échec du téléchargement de %d images</item>
+    </plurals>
 </resources>
