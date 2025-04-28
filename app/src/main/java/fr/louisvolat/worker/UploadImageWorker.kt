@@ -15,10 +15,11 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.util.UUID
+import androidx.core.net.toUri
 
 /**
  * Worker amélioré pour l'upload d'images
- * Applique le principe de substitution de Liskov (L de SOLID) en étant interchangeable avec d'autres workers
+ * Résout les problèmes de synchronisation et d'initialisation
  */
 class UploadImageWorker(
     appContext: Context,
@@ -26,16 +27,38 @@ class UploadImageWorker(
 ) : CoroutineWorker(appContext, params) {
 
     private val tag = "UploadImageWorker"
-    private val uploadManager = ImageUploadManager.getInstance(appContext)
-    private val apiClient = ApiClient.getInstance(appContext)
+
+    private val uploadManager by lazy {
+        try {
+            Log.d(tag, "Initialisation de uploadManager")
+            ImageUploadManager.getInstance(appContext)
+        } catch (e: Exception) {
+            Log.e(tag, "Erreur lors de l'initialisation de uploadManager", e)
+            null
+        }
+    }
+
+    private val apiClient by lazy {
+        try {
+            Log.d(tag, "Initialisation de apiClient")
+            ApiClient.getInstance(appContext)
+        } catch (e: Exception) {
+            Log.e(tag, "Erreur lors de l'initialisation de apiClient", e)
+            null
+        }
+    }
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
+            Log.d(tag, "doWork méthode appelée")
+
             val uploadId = inputData.getString(ImageUploadManager.KEY_UPLOAD_ID) ?: return@withContext Result.failure()
             val uriStrings = inputData.getStringArray(ImageUploadManager.KEY_URI_LIST) ?: return@withContext Result.failure()
             val travelId = inputData.getLong(ImageUploadManager.KEY_TRAVEL_ID, -1L)
             val totalImages = inputData.getInt(ImageUploadManager.KEY_TOTAL_IMAGES, 0)
             val startIndex = inputData.getInt(ImageUploadManager.KEY_CURRENT_INDEX, 0)
+
+            Log.d(tag, "Données d'entrée: uploadId=$uploadId, travelId=$travelId, totalImages=$totalImages, startIndex=$startIndex, uriCount=${uriStrings.size}")
 
             if (travelId == -1L || uriStrings.isEmpty()) {
                 Log.e(tag, "Invalid travel ID or empty URI list")
@@ -49,7 +72,8 @@ class UploadImageWorker(
             for (i in startIndex until uriStrings.size) {
                 currentIndex = i
                 val uriString = uriStrings[i]
-                val uri = Uri.parse(uriString)
+                val uri = uriString.toUri()
+                Log.d(tag, "Traitement de l'URI $i: $uriString")
 
                 // Mettre à jour la notification
                 val currentProgress = (i * 100) / totalImages
@@ -60,9 +84,16 @@ class UploadImageWorker(
                 ))
 
                 val result = uploadSingleImage(uri, travelId)
+                Log.d(tag, "Résultat upload image $i: $result")
 
-                // Mettre à jour l'état de l'upload
-                uploadManager.updateUploadState(uploadId, i, result, uri)
+                // IMPORTANT: S'assurer que updateUploadState est appelé et complété
+                try {
+                    Log.d(tag, "Mise à jour de l'état pour l'image $i")
+                    uploadManager?.updateUploadState(uploadId, i, result, uri)
+                    Log.d(tag, "État mis à jour avec succès pour l'image $i")
+                } catch (e: Exception) {
+                    Log.e(tag, "Erreur lors de la mise à jour de l'état pour l'image $i", e)
+                }
 
                 if (result) {
                     successCount++
@@ -85,6 +116,8 @@ class UploadImageWorker(
                 "failed_count" to (uriStrings.size - successCount)
             )
 
+            Log.d(tag, "Worker terminé: successCount=$successCount, totalCount=${uriStrings.size}")
+
             // Déterminer le résultat final
             return@withContext if (successCount == uriStrings.size) {
                 Result.success(outputData)
@@ -95,7 +128,7 @@ class UploadImageWorker(
             }
 
         } catch (e: Exception) {
-            Log.e(tag, "Error in upload worker", e)
+            Log.e(tag, "Erreur dans upload worker", e)
             return@withContext Result.failure(
                 workDataOf("error" to (e.message ?: "Unknown error"))
             )
@@ -109,10 +142,19 @@ class UploadImageWorker(
         var tempFile: File? = null
 
         try {
+            Log.d(tag, "Début uploadSingleImage pour URI: $uri")
+
             // Créer un fichier temporaire
             tempFile = createTempFileFromUri(uri)
             if (tempFile == null) {
                 Log.e(tag, "Failed to create temp file from URI: $uri")
+                return false
+            }
+            Log.d(tag, "Fichier temporaire créé: ${tempFile.absolutePath}, taille: ${tempFile.length()}")
+
+            // Vérifier que l'API client est disponible
+            if (apiClient == null) {
+                Log.e(tag, "ApiClient est null, impossible de faire l'upload")
                 return false
             }
 
@@ -123,18 +165,25 @@ class UploadImageWorker(
                 UUID.randomUUID().toString(),
                 requestBody
             )
+            Log.d(tag, "MultipartBody préparé, envoi de la requête")
 
             // Exécuter l'upload
-            val response = apiClient.pictureService.uploadPicture(travelId, filePart).execute()
+            val response = apiClient!!.pictureService.uploadPicture(travelId, filePart).execute()
+            Log.d(tag, "Réponse reçue: isSuccessful=${response.isSuccessful}, code=${response.code()}")
 
             return response.isSuccessful
 
         } catch (e: Exception) {
-            Log.e(tag, "Error uploading image", e)
+            Log.e(tag, "Erreur lors de l'upload de l'image", e)
             return false
         } finally {
             // Nettoyer le fichier temporaire
-            tempFile?.delete()
+            try {
+                tempFile?.delete()
+                Log.d(tag, "Fichier temporaire supprimé")
+            } catch (e: Exception) {
+                Log.e(tag, "Erreur lors de la suppression du fichier temporaire", e)
+            }
         }
     }
 
@@ -143,16 +192,35 @@ class UploadImageWorker(
      */
     private suspend fun createTempFileFromUri(uri: Uri): File? = withContext(Dispatchers.IO) {
         try {
+            Log.d(tag, "Création du fichier temporaire pour $uri")
             val tempFile = File(applicationContext.cacheDir, "temp_upload_${System.currentTimeMillis()}.jpg")
+
             applicationContext.contentResolver.openInputStream(uri)?.use { input ->
                 tempFile.outputStream().use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    var totalBytes = 0L
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        totalBytes += bytesRead
+                    }
+                    Log.d(tag, "Copie terminée: $totalBytes octets écrits")
                 }
+            } ?: run {
+                Log.e(tag, "Impossible d'ouvrir l'InputStream pour l'URI: $uri")
+                return@withContext null
             }
-            tempFile
+
+            if (!tempFile.exists() || tempFile.length() == 0L) {
+                Log.e(tag, "Fichier temporaire invalide: existe=${tempFile.exists()}, taille=${tempFile.length()}")
+                return@withContext null
+            }
+
+            Log.d(tag, "Fichier temporaire créé avec succès: ${tempFile.length()} octets")
+            return@withContext tempFile
         } catch (e: Exception) {
-            Log.e(tag, "Error creating temp file", e)
-            null
+            Log.e(tag, "Erreur lors de la création du fichier temporaire", e)
+            return@withContext null
         }
     }
 }
