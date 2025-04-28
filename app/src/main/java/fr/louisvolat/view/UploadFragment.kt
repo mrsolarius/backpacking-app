@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.work.WorkInfo
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import fr.louisvolat.RunningApp
 import fr.louisvolat.api.ApiClient
 import fr.louisvolat.data.repository.PictureRepository
 import fr.louisvolat.data.repository.TravelRepository
@@ -44,7 +45,8 @@ class UploadFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        uploadManager = ImageUploadManager.getInstance(requireContext())
+        val appContext = requireContext().applicationContext as RunningApp;
+        uploadManager = appContext.imageUploadManager
         notificationManager = UploadNotificationManager(requireContext())
 
         // Initialiser les lanceurs pour les permissions

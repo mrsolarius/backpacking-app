@@ -7,9 +7,14 @@ import fr.louisvolat.data.repository.TrackingRepositoryProvider
 import fr.louisvolat.lifecycle.AppStateManager
 import fr.louisvolat.lifecycle.AppStateManagerImpl
 import fr.louisvolat.locations.LocationService
+import fr.louisvolat.upload.ImageUploadManager
 
 class RunningApp: Application() {
     private lateinit var appStateManager: AppStateManager
+
+    val imageUploadManager by lazy {
+        ImageUploadManager(applicationContext)
+    }
 
     override fun onCreate() {
         super.onCreate()

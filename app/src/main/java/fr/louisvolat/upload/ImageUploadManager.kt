@@ -32,17 +32,6 @@ class ImageUploadManager(private val context: Context) {
         const val KEY_TRAVEL_ID = "travel_id"
         const val KEY_TOTAL_IMAGES = "total_images"
         const val KEY_CURRENT_INDEX = "current_index"
-
-        @Volatile
-        private var INSTANCE: ImageUploadManager? = null
-
-        fun getInstance(context: Context): ImageUploadManager {
-            return INSTANCE ?: synchronized(this) {
-                val instance = ImageUploadManager(context.applicationContext)
-                INSTANCE = instance
-                instance
-            }
-        }
     }
 
     private val workManager = WorkManager.getInstance(context)
@@ -207,7 +196,7 @@ class ImageUploadManager(private val context: Context) {
             currentImageIndex = currentIndex,
             pendingUris = newPendingUris,
             failedUris = newFailedUris,
-            isUploading = newPendingUris.isNotEmpty() || currentIndex < currentState.totalImages - 1  // Correction ici
+            isUploading = newPendingUris.isNotEmpty() || currentIndex < currentState.totalImages - 1
         )
 
         Log.d("ImageUploadManager", "Nouvel état: isUploading=${newState.isUploading}, totalImages=${newState.totalImages}, uploadedImages=${newState.uploadedImages}, progress=${newState.progress}%")

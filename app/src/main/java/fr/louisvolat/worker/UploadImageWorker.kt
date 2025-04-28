@@ -16,6 +16,7 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import java.util.UUID
 import androidx.core.net.toUri
+import fr.louisvolat.RunningApp
 
 /**
  * Worker amélioré pour l'upload d'images
@@ -31,7 +32,7 @@ class UploadImageWorker(
     private val uploadManager by lazy {
         try {
             Log.d(tag, "Initialisation de uploadManager")
-            ImageUploadManager.getInstance(appContext)
+            (appContext as RunningApp).imageUploadManager
         } catch (e: Exception) {
             Log.e(tag, "Erreur lors de l'initialisation de uploadManager", e)
             null
