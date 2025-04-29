@@ -2,6 +2,7 @@ package fr.louisvolat.api.services
 
 import fr.louisvolat.api.dto.PictureDTO
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.Call
 import retrofit2.http.*
 
@@ -19,7 +20,7 @@ interface PictureService {
     @Multipart
     fun uploadPicture(
         @Path("travelId") travelId: Long,
-        @Part picture: MultipartBody.Part
+        @Part parts: List<MultipartBody.Part>
     ): Call<PictureDTO>
 
     @POST("/api/travels/{travelId}/pictures/{id}/set-as-cover")

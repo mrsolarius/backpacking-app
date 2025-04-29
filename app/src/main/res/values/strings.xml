@@ -110,6 +110,9 @@
     <string name="select_travel_for_retry">Selectioner un voyage pour upload\n</string>
     <string name="select_travel_first">Commencer par sélectioner un voyage</string>
     <string name="ok">Ok</string>
+    <string name="storage_permission_explanation">L\'accès aux photos est nécessaire pour sélectionner et télécharger vos images avec toutes leurs métadonnées.</string>
+    <string name="storage_permission_settings_explanation">Pour télécharger des images avec toutes leurs métadonnées, l\'application a besoin d\'accéder à vos photos. Veuillez activer cette permission dans les paramètres.</string>
+    <string name="permission_needed_explanation_generic">Cette permission est nécessaire pour le bon fonctionnement de l\'application.</string>
     <plurals name="upload_failed_count_plural">
         <item quantity="one">Échec du téléchargement d\'une image</item>
         <item quantity="other">Échec du téléchargement de %d images</item>

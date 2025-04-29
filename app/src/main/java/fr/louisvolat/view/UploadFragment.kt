@@ -1,12 +1,14 @@
 package fr.louisvolat.view
 
-import UploadImageViewModelFactory // Assurez-vous que l'import est correct
+import UploadImageViewModelFactory
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
 import android.view.LayoutInflater
@@ -21,18 +23,17 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fr.louisvolat.R
-import fr.louisvolat.RunningApp
-import fr.louisvolat.api.ApiClient // Conservé pour TravelViewModelFactory si nécessaire
-import fr.louisvolat.data.repository.PictureRepository // Conservé pour TravelViewModelFactory
-import fr.louisvolat.data.repository.TravelRepository // Conservé pour TravelViewModelFactory
+import fr.louisvolat.api.ApiClient
+import fr.louisvolat.data.repository.PictureRepository
+import fr.louisvolat.data.repository.TravelRepository
 import fr.louisvolat.data.viewmodel.TravelViewModel
-import fr.louisvolat.data.viewmodel.TravelViewModelFactory // Conservé pour TravelViewModelFactory
-import fr.louisvolat.database.BackpakingLocalDataBase // Conservé pour TravelViewModelFactory
+import fr.louisvolat.data.viewmodel.TravelViewModelFactory
+import fr.louisvolat.database.BackpakingLocalDataBase
 import fr.louisvolat.databinding.FragmentUploadBinding
-import fr.louisvolat.upload.di.ServiceLocator // Import du ServiceLocator
-import fr.louisvolat.upload.UploadNotificationService // Import du service de notif
-import fr.louisvolat.upload.state.UploadState // Import de l'état
-import fr.louisvolat.upload.viewmodel.UploadImageViewModel // Import du ViewModel
+import fr.louisvolat.upload.di.ServiceLocator
+import fr.louisvolat.upload.UploadNotificationService
+import fr.louisvolat.upload.state.UploadState
+import fr.louisvolat.upload.viewmodel.UploadImageViewModel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -42,7 +43,8 @@ class UploadFragment : Fragment() {
 
     // ViewModel pour l'upload, injecté via Factory et ServiceLocator
     private val uploadViewModel: UploadImageViewModel by lazy {
-        val factory = UploadImageViewModelFactory(ServiceLocator.provideUploadService(requireContext()))
+        val factory =
+            UploadImageViewModelFactory(ServiceLocator.provideUploadService(requireContext()))
         ViewModelProvider(this, factory)[UploadImageViewModel::class.java]
     }
 
@@ -53,7 +55,6 @@ class UploadFragment : Fragment() {
 
     // ViewModel partagé pour obtenir l'ID du voyage sélectionné
     private val travelViewModel: TravelViewModel by activityViewModels {
-        // Assurez-vous que les dépendances pour TravelViewModelFactory sont correctes
         val database = BackpakingLocalDataBase.getDatabase(requireContext())
         val pictureRepository = PictureRepository(
             database.pictureDao(),
@@ -72,8 +73,9 @@ class UploadFragment : Fragment() {
     private var travelId: Long = -1L
 
     // Lanceurs pour les permissions et la sélection d'images
-    private lateinit var pickImagesLauncher: ActivityResultLauncher<String>
+    private lateinit var pickImagesLauncher: ActivityResultLauncher<Intent>
     private lateinit var notificationPermissionRequest: ActivityResultLauncher<String>
+    private lateinit var storagePermissionRequest: ActivityResultLauncher<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,28 +83,58 @@ class UploadFragment : Fragment() {
     }
 
     private fun registerPermissionLaunchers() {
-        // Launcher pour sélectionner des images
-        pickImagesLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-            if (uris.isNotEmpty()) {
-                startImageUpload(uris)
+        // Launcher pour sélectionner des images depuis MediaStore (pour avoir les EXIF)
+        pickImagesLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    val uris = mutableListOf<Uri>()
+
+                    // Traiter les résultats (sélection multiple)
+                    result.data?.clipData?.let { clipData ->
+                        for (i in 0 until clipData.itemCount) {
+                            uris.add(clipData.getItemAt(i).uri)
+                        }
+                    } ?: result.data?.data?.let { uri ->
+                        // Sélection unique
+                        uris.add(uri)
+                    }
+
+                    if (uris.isNotEmpty()) {
+                        startImageUpload(uris)
+                    }
+                }
             }
-        }
 
         // Launcher pour la permission de notification (requise pour Android 13+)
         notificationPermissionRequest = registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { isGranted ->
             if (isGranted) {
-                // Permission accordée, lancer la sélection d'images
-                pickImagesLauncher.launch("image/*")
+                // Permission accordée, vérifier maintenant la permission de stockage
+                checkStoragePermissionAndPickImages()
             } else {
                 // La permission de notification a été refusée
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
-                        showPermissionExplanationDialog()
-                    } else {
-                        showPermissionSettingsDialog()
-                    }
+                if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                    showPermissionExplanationDialog(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    showPermissionSettingsDialog(getString(R.string.notification_permission_settings_explanation))
+                }
+            }
+        }
+
+        // Launcher pour la permission d'accès au stockage externe
+        storagePermissionRequest = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+            if (isGranted) {
+                // Permission accordée, lancer la sélection d'images via MediaStore
+                launchMediaStorePicker()
+            } else {
+                // La permission de stockage a été refusée
+                if (shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                    showPermissionExplanationDialog(Manifest.permission.READ_EXTERNAL_STORAGE)
+                } else {
+                    showPermissionSettingsDialog(getString(R.string.storage_permission_settings_explanation))
                 }
             }
         }
@@ -124,7 +156,8 @@ class UploadFragment : Fragment() {
             travelId = selectedId ?: -1L // Utiliser -1L si null
             Log.d("UploadFragment", "TravelId mis à jour: $travelId")
             // Mettre à jour l'état du bouton upload si l'ID change pendant que le fragment est visible
-            binding.btnUploadImages.isEnabled = travelId != -1L && uploadViewModel.uploadState.value?.isUploading != true
+            binding.btnUploadImages.isEnabled =
+                travelId != -1L && uploadViewModel.uploadState.value?.isUploading != true
         }
 
         setupListeners()
@@ -135,7 +168,7 @@ class UploadFragment : Fragment() {
         binding.btnUploadImages.setOnClickListener {
             // Vérifier si un voyage est sélectionné
             if (travelId == -1L) {
-                binding.tvUploadStatus.text = getString(R.string.select_travel_first) // Utiliser les ressources string
+                binding.tvUploadStatus.text = getString(R.string.select_travel_first)
                 return@setOnClickListener
             }
             // Vérifier les permissions avant de lancer la sélection d'images
@@ -151,7 +184,7 @@ class UploadFragment : Fragment() {
             if (travelId != -1L) {
                 uploadViewModel.retryFailedUploads()
             } else {
-                binding.tvUploadStatus.text = getString(R.string.select_travel_for_retry) // Message spécifique
+                binding.tvUploadStatus.text = getString(R.string.select_travel_for_retry)
             }
         }
     }
@@ -163,13 +196,15 @@ class UploadFragment : Fragment() {
                 requireContext(),
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED -> {
-                // Permission accordée
-                pickImagesLauncher.launch("image/*")
+                // Permission accordée, vérifier la permission de stockage
+                checkStoragePermissionAndPickImages()
             }
+
             shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) -> {
                 // Afficher une explication
-                showPermissionExplanationDialog()
+                showPermissionExplanationDialog(Manifest.permission.POST_NOTIFICATIONS)
             }
+
             else -> {
                 // Demander la permission directement
                 notificationPermissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -177,11 +212,42 @@ class UploadFragment : Fragment() {
         }
     }
 
+    private fun checkStoragePermissionAndPickImages() {
+        val permissionToCheck = Manifest.permission.READ_MEDIA_IMAGES
+
+        when {
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                permissionToCheck
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                // Permission de stockage accordée, lancer le sélecteur
+                launchMediaStorePicker()
+            }
+
+            shouldShowRequestPermissionRationale(permissionToCheck) -> {
+                // Afficher une explication
+                showPermissionExplanationDialog(permissionToCheck)
+            }
+
+            else -> {
+                // Demander la permission directement
+                storagePermissionRequest.launch(permissionToCheck)
+            }
+        }
+    }
+
+    private fun launchMediaStorePicker() {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        intent.type = "image/*"
+        pickImagesLauncher.launch(intent)
+    }
+
     private fun observeUploadState() {
         viewLifecycleOwner.lifecycleScope.launch {
             uploadViewModel.uploadState.collectLatest { state ->
                 updateUI(state)
-                handleNotifications(state) // Gérer les notifications basé sur l'état
+                handleNotifications(state)
             }
         }
     }
@@ -189,11 +255,15 @@ class UploadFragment : Fragment() {
     @androidx.annotation.RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     private fun handleNotifications(state: UploadState) {
         // Vérifier la permission seulement si nécessaire (Android 13+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            // Ne rien faire si la permission n'est pas accordée sur Android 13+
-            // Log pour débogage
-            Log.w("UploadFragment", "Notification permission not granted on Android 13+, cannot show notifications.")
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(
+                "UploadFragment",
+                "Notification permission not granted on Android 13+, cannot show notifications."
+            )
             return
         }
 
@@ -208,8 +278,8 @@ class UploadFragment : Fragment() {
             binding.tvUploadProgress.visibility = View.GONE
             binding.btnCancelUpload.visibility = View.GONE
             binding.btnRetryUpload.visibility = View.GONE
-            binding.tvUploadStatus.text = getString(R.string.ready_to_upload) // Utiliser string resource
-            binding.btnUploadImages.isEnabled = travelId != -1L // Activer si un voyage est sélectionné
+            binding.tvUploadStatus.text = getString(R.string.ready_to_upload)
+            binding.btnUploadImages.isEnabled = travelId != -1L
             return
         }
 
@@ -222,9 +292,12 @@ class UploadFragment : Fragment() {
             tvUploadStatus.text = when {
                 state.isUploading -> getString(R.string.uploading_in_progress)
                 state.isComplete && !state.hasErrors -> getString(R.string.upload_completed)
-                state.hasErrors -> getString(R.string.upload_failed_count, state.failedUris.size) // Utiliser string resource avec argument
-                state.error != null && state.error == "Upload annulé par l'utilisateur" -> getString(R.string.upload_cancelled_user)
-                state.error != null -> getString(R.string.upload_failed_generic) // Message générique pour autres erreurs
+                state.hasErrors -> getString(R.string.upload_failed_count, state.failedUris.size)
+                state.error != null && state.error == "Upload annulé par l'utilisateur" -> getString(
+                    R.string.upload_cancelled_user
+                )
+
+                state.error != null -> getString(R.string.upload_failed_generic)
                 else -> if (travelId != -1L) getString(R.string.ready_to_upload) else getString(R.string.select_travel_first)
             }
 
@@ -234,7 +307,8 @@ class UploadFragment : Fragment() {
             tvUploadProgress.visibility = if (showProgress) View.VISIBLE else View.GONE
             btnCancelUpload.visibility = if (showProgress) View.VISIBLE else View.GONE
             // Afficher Retry seulement s'il y a des erreurs et qu'aucun upload n'est en cours
-            btnRetryUpload.visibility = if (state.hasErrors && !state.isUploading) View.VISIBLE else View.GONE
+            btnRetryUpload.visibility =
+                if (state.hasErrors && !state.isUploading) View.VISIBLE else View.GONE
             // Désactiver le bouton Upload si un upload est en cours ou si aucun voyage n'est sélectionné
             btnUploadImages.isEnabled = !state.isUploading && travelId != -1L
         }
@@ -247,27 +321,41 @@ class UploadFragment : Fragment() {
         if (travelId != -1L) {
             uploadViewModel.uploadImages(uris, travelId)
         } else {
-            binding.tvUploadStatus.text = getString(R.string.error_starting_upload_no_travel) // Message d'erreur clair
+            binding.tvUploadStatus.text = getString(R.string.error_starting_upload_no_travel)
             Log.e("UploadFragment", "Tentative d'upload sans travelId valide.")
         }
     }
 
-    // Les fonctions de dialogue pour les permissions sont conservées
-    private fun showPermissionExplanationDialog() {
+    // Fonction générique pour afficher un dialogue d'explication pour les permissions
+    private fun showPermissionExplanationDialog(permission: String) {
+        val explanationMessage = when (permission) {
+            Manifest.permission.POST_NOTIFICATIONS -> getString(R.string.notification_permission_explanation)
+            Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.READ_MEDIA_IMAGES ->
+                getString(R.string.storage_permission_explanation)
+
+            else -> getString(R.string.permission_needed_explanation_generic)
+        }
+
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.permission_needed_title))
-            .setMessage(getString(R.string.notification_permission_explanation))
+            .setMessage(explanationMessage)
             .setPositiveButton(getString(R.string.retry)) { _, _ ->
-                notificationPermissionRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
+                when (permission) {
+                    Manifest.permission.POST_NOTIFICATIONS ->
+                        notificationPermissionRequest.launch(permission)
+
+                    Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.READ_MEDIA_IMAGES ->
+                        storagePermissionRequest.launch(permission)
+                }
             }
             .setNegativeButton(getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
             .show()
     }
 
-    private fun showPermissionSettingsDialog() {
+    private fun showPermissionSettingsDialog(explanationMessage: String) {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.permission_denied_title))
-            .setMessage(getString(R.string.notification_permission_settings_explanation))
+            .setMessage(explanationMessage)
             .setPositiveButton(getString(R.string.settings)) { _, _ ->
                 // Ouvrir les paramètres de l'application
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
@@ -278,7 +366,6 @@ class UploadFragment : Fragment() {
             .setNegativeButton(getString(R.string.cancel)) { dialog, _ -> dialog.dismiss() }
             .show()
     }
-
 
     override fun onDestroyView() {
         super.onDestroyView()

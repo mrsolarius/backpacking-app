@@ -1,6 +1,7 @@
 package fr.louisvolat.worker
 
 import android.content.Context
+import android.media.ExifInterface
 import android.net.Uri
 import android.util.Log
 import androidx.work.CoroutineWorker
@@ -198,16 +199,37 @@ class UploadImageWorker(
             }
 
             val requestBody = tempFile.asRequestBody("image/*".toMediaTypeOrNull())
-            val filePart = MultipartBody.Part.createFormData(
-                "picture",
-                // Utiliser un nom de fichier unique ou pertinent si nécessaire
-                // tempFile.name ?: UUID.randomUUID().toString(),
-                UUID.randomUUID().toString(), // Garder UUID si le nom n'importe pas
-                requestBody
+            val body = requestBody.let {
+                MultipartBody.Part.createFormData("picture", UUID.randomUUID().toString(), it)
+            }
+
+            // Mais ensuite, pas besoin de construire un MultipartBody complet
+            // Au lieu de tout ce bloc multipartBodyBuilder...
+            // val multipartBodyBuilder = MultipartBody.Builder()...
+
+            // Si vous avez besoin d'ajouter des métadonnées EXIF, utilisez des @Part supplémentaires
+            val exifInterface = ExifInterface(tempFile)
+            val tagsToCheck = arrayOf(
+                ExifInterface.TAG_DATETIME,
+                ExifInterface.TAG_GPS_LATITUDE,
+                ExifInterface.TAG_GPS_LONGITUDE,
+                ExifInterface.TAG_GPS_ALTITUDE
             )
+
+            // Créer une liste pour stocker toutes les parties
+            val parts = mutableListOf<MultipartBody.Part>()
+            parts.add(body) // Ajouter l'image
+
+            // Ajouter les métadonnées EXIF si présentes
+            for (tag in tagsToCheck) {
+                exifInterface.getAttribute(tag)?.let { value ->
+                    parts.add(MultipartBody.Part.createFormData("exif_$tag", value))
+                }
+            }
+
             Log.d(tag, "MultipartBody préparé, envoi de la requête")
 
-            val response = apiClient!!.pictureService.uploadPicture(travelId, filePart).execute()
+            val response = apiClient!!.pictureService.uploadPicture(travelId, parts).execute()
             Log.d(
                 tag,
                 "Réponse reçue: isSuccessful=${response.isSuccessful}, code=${response.code()}"
