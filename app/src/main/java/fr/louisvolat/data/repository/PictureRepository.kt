@@ -8,8 +8,11 @@ import fr.louisvolat.api.ApiClient
 import fr.louisvolat.api.dto.PictureDTO
 import fr.louisvolat.data.mapper.PictureMapper
 import fr.louisvolat.database.dao.PictureDao
+import fr.louisvolat.database.entity.Picture
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -90,7 +93,7 @@ class PictureRepository(
             }
         }
 
-    // Nouvelle méthode pour définir une image comme couverture
+    // Méthode pour définir une image comme couverture
     suspend fun setCoverPicture(travelId: Long, pictureId: Long): Result<Unit> =
         withContext(ioDispatcher) {
             try {
@@ -106,4 +109,63 @@ class PictureRepository(
                 Result.failure(e)
             }
         }
+
+    // Récupérer toutes les photos d'un voyage depuis l'API
+    suspend fun getPicturesForTravel(travelId: Long): Result<List<PictureDTO>> = withContext(ioDispatcher) {
+        try {
+            val response = apiClient.pictureService.getPicturesByTravel(travelId).execute()
+
+            if (response.isSuccessful) {
+                val pictures = response.body() ?: emptyList()
+                // Stocker les images dans la base de données locale
+                val pictureEntities = pictures.map { pictureDTO ->
+                    PictureMapper.toEntityWithLocalPathAndTravelId(
+                        pictureDTO,
+                        "", // pas de chemin local pour le moment
+                        travelId
+                    )
+                }
+                pictureDao.insertAll(pictureEntities)
+                Result.success(pictures)
+            } else {
+                Result.failure(Exception("API error: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Récupérer les photos d'un voyage en tant que Flow pour mise à jour en temps réel
+    fun getPicturesForTravelAsFlow(travelId: Long): Flow<List<PictureDTO>> = flow {
+        try {
+            val response = apiClient.pictureService.getPicturesByTravel(travelId).execute()
+            if (response.isSuccessful) {
+                response.body()?.let { emit(it) }
+            }
+        } catch (e: Exception) {
+            // Gérer l'erreur silencieusement
+        }
+    }
+
+    // Supprimer une photo
+    suspend fun deletePicture(travelId: Long, pictureId: Long): Result<Unit> = withContext(ioDispatcher) {
+        try {
+            val response = apiClient.pictureService.deletePicture(travelId, pictureId).execute()
+
+            if (response.isSuccessful) {
+                // Supprimer aussi de la base de données locale
+                pictureDao.deletePictureById(pictureId)
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("API error: ${response.code()} - ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    // Obtenir les photos d'un voyage depuis la base de données locale
+    suspend fun getLocalPicturesForTravel(travelId: Long): List<Picture> = withContext(ioDispatcher) {
+        pictureDao.getByTravel(travelId)
+    }
 }

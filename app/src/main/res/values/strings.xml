@@ -117,4 +117,16 @@
         <item quantity="one">Échec du téléchargement d\'une image</item>
         <item quantity="other">Échec du téléchargement de %d images</item>
     </plurals>
+    <string name="no_pictures_found">Aucune photo trouvée</string>
+    <string name="set_as_cover">Définir comme couverture</string>
+    <string name="delete_picture">Supprimer</string>
+    <string name="delete_confirmation_title">Confirmation</string>
+    <string name="delete_confirmation">Voulez-vous vraiment supprimer cette image ?</string>
+    <string name="yes">Oui</string>
+    <string name="no">Non</string>
+    <string name="operation_success">Opération réussie</string>
+    <string name="set_cover_success">Image définie comme couverture</string>
+    <string name="delete_success">Image supprimée</string>
+    <string name="error_loading_pictures">Erreur lors du chargement des images</string>
+    <string name="view_full_image">Voir l\'image en plein écran</string>
 </resources>
