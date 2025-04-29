@@ -347,7 +347,7 @@ class LocationService : LifecycleService(), LocationSaver {
         // Créer les données d'entrée avec le travelId
         val inputData = createWorkerInputData(travelId)
 
-        val uploadWorkerRequest = PeriodicWorkRequestBuilder<UploadLocationsWorker>(90, TimeUnit.MINUTES)
+        val uploadWorkerRequest = PeriodicWorkRequestBuilder<UploadLocationsWorker>(45, TimeUnit.MINUTES)
             .setConstraints(constraints)
             .setInputData(inputData)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)

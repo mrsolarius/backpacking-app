@@ -20,6 +20,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fr.louisvolat.R
 import fr.louisvolat.api.ApiClient
@@ -34,6 +40,7 @@ import fr.louisvolat.database.BackpakingLocalDataBase
 import fr.louisvolat.databinding.FragmentTrackerBinding
 import fr.louisvolat.locations.LocationService
 import fr.louisvolat.locations.TrackingState
+import fr.louisvolat.worker.UploadLocationsWorker
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -190,6 +197,11 @@ class TrackerFragment : Fragment() {
         // Mise à jour de l'interface utilisateur
         binding.apply {
             // Remarque: Le temps est mis à jour séparément par la collecte de timerUpdates
+            buttonSend.setOnClickListener {
+                if (state.isTracking) {
+                    sendTrackingData()
+                }
+            }
 
             if (state.isTracking) {
                 buttonTrack.text = if (state.isPaused)
@@ -362,5 +374,65 @@ class TrackerFragment : Fragment() {
             }
             .setNegativeButton("Annuler") { dialog, _ -> dialog.dismiss() }
             .show()
+    }
+
+    private fun sendTrackingData() {
+        if (travelId == -1L) {
+            Toast.makeText(
+                requireContext(),
+                "Impossible d'envoyer les données: aucun voyage sélectionné",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        // Créer les contraintes (connexion requise)
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // Créer les données d'entrée avec le travelId
+        val inputData = Data.Builder()
+            .putLong(UploadLocationsWorker.KEY_TRAVEL_ID, travelId)
+            .build()
+
+        // Créer une requête d'exécution unique du worker
+        val uploadRequest = OneTimeWorkRequest.Builder(UploadLocationsWorker::class.java)
+            .setConstraints(constraints)
+            .setInputData(inputData)
+            .build()
+
+        // Exécuter le worker et observer le résultat
+        WorkManager.getInstance(requireContext()).enqueue(uploadRequest)
+
+        // Informer l'utilisateur que l'envoi a été déclenché
+        Toast.makeText(
+            requireContext(),
+            "Envoi des données de localisation en cours...",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        // Optionnel: observer le résultat de l'envoi
+        WorkManager.getInstance(requireContext())
+            .getWorkInfoByIdLiveData(uploadRequest.id)
+            .observe(viewLifecycleOwner) { workInfo ->
+                when (workInfo?.state) {
+                    WorkInfo.State.SUCCEEDED -> {
+                        Toast.makeText(
+                            requireContext(),
+                            "Données envoyées avec succès",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    WorkInfo.State.FAILED -> {
+                        Toast.makeText(
+                            requireContext(),
+                            "Échec de l'envoi des données",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    else -> {} // Ignorer les autres états
+                }
+            }
     }
 }
